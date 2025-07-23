@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: f1f11a26651e0d846a4ee89d17762034
+guid: 6f7e0ce70476ea54e81aa7e7a698ebd6
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7938239459515798589
-    second: background_pink_0
+      213: 8423520626789853753
+    second: DollBody_compressed_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -72,12 +72,12 @@ TextureImporter:
   platformSettings:
   - serializedVersion: 4
     buildTarget: DefaultTexturePlatform
-    maxTextureSize: 1024
+    maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
     textureCompression: 1
     compressionQuality: 50
-    crunchedCompression: 1
+    crunchedCompression: 0
     allowsAlphaSplitting: 0
     overridden: 0
     ignorePlatformSupport: 0
@@ -178,13 +178,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: background_pink_0
+      name: DollBody_compressed_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 4000
-        height: 4000
+        x: 156
+        y: 128
+        width: 686
+        height: 1717
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -193,8 +193,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d349d66daba4a2e60800000000000000
-      internalID: 7938239459515798589
+      spriteID: 93a2cfd516b56e470800000000000000
+      internalID: 8423520626789853753
       vertices: []
       indices: 
       edges: []
@@ -212,8 +212,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      background_pink_0: 7938239459515798589
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
