@@ -1,4 +1,4 @@
-// HandController.cs (Простая версия с отключением коллайдера)
+// HandController.cs (Финальная версия)
 using UnityEngine;
 using UnityEngine.EventSystems;
 using System;
@@ -7,15 +7,14 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
 {
     [Header("Настройки Руки")]
     public Transform gripPoint;
+    public float moveSpeed = 5f;
+    public Transform startPositionMarker; 
 
-    private Collider2D attachedItemCollider; // Храним ссылку на коллайдер предмета
-
-    // --- Переменные для движения и перетаскивания ---
+    private ClickableItem attachedItem;
     private Vector3 autoTargetPosition;
-    private float moveSpeed;
     private Action onMovementComplete;
     private bool isMovingAutomated = false;
-    public bool isDraggable = false;
+    [HideInInspector] public bool isDraggable = false;
     private Vector3 dragOffset;
     private Camera mainCamera;
 
@@ -23,40 +22,58 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     {
         mainCamera = Camera.main;
         if (gripPoint == null) gripPoint = this.transform;
-    }
-
-    // --- Методы для управления предметом ---
-    public void AttachItem(Transform item)
-    {
-        item.SetParent(gripPoint);
-        item.localPosition = Vector3.zero;
-
-        // Находим и ОТКЛЮЧАЕМ коллайдер
-        attachedItemCollider = item.GetComponent<Collider2D>();
-        if (attachedItemCollider != null)
+        if (startPositionMarker == null)
         {
-            attachedItemCollider.enabled = false;
+            Debug.LogError("У HandController не назначен маркер стартовой позиции!", this);
         }
     }
 
-    public void DetachItem(Transform item)
+    void Start()
     {
-        // ВКЛЮЧАЕМ коллайдер обратно
-        if (attachedItemCollider != null)
+        // При старте игры рука сразу перемещается на свою стартовую позицию
+        if (startPositionMarker != null)
         {
-            attachedItemCollider.enabled = true;
+            transform.position = startPositionMarker.position;
         }
-        item.SetParent(null);
-        attachedItemCollider = null;
     }
 
-    // --- Остальная логика без изменений ---
-    public void MoveTo(Vector3 target, float speed, Action onCompleteCallback)
+    public void AttachItem(ClickableItem item)
+    {
+        attachedItem = item;
+        attachedItem.transform.SetParent(gripPoint);
+        attachedItem.transform.localPosition = Vector3.zero;
+    }
+
+    public void DetachItem()
+    {
+        if (attachedItem == null) return;
+        attachedItem.transform.SetParent(null);
+        attachedItem = null;
+    }
+
+    public ClickableItem GetAttachedItem()
+    {
+        return attachedItem;
+    }
+
+    public void MoveTo(Vector3 target, Action onCompleteCallback)
     {
         autoTargetPosition = target;
-        moveSpeed = speed;
         onMovementComplete = onCompleteCallback;
         isMovingAutomated = true;
+    }
+
+    // Новый метод для возврата на стартовую позицию
+    public void ReturnToStartPosition(Action onCompleteCallback)
+    {
+        if (startPositionMarker != null)
+        {
+            MoveTo(startPositionMarker.position, onCompleteCallback);
+        }
+        else
+        {
+            onCompleteCallback?.Invoke(); // Сразу завершаем, если нет маркера
+        }
     }
 
     void Update()
@@ -89,7 +106,7 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     public void OnEndDrag(PointerEventData eventData)
     {
         if (!isDraggable || isMovingAutomated) return;
-        GameManager.Instance.OnDragEnded(transform.position);
+        GameManager.Instance.OnDragEnded();
     }
 
     private Vector3 GetMouseWorldPos()

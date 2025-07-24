@@ -338,6 +338,7 @@ Transform:
   m_Children:
   - {fileID: 246192925}
   - {fileID: 1135027334}
+  - {fileID: 915427401}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &246192924
@@ -979,6 +980,7 @@ GameObject:
   - component: {fileID: 600320990}
   - component: {fileID: 600320991}
   - component: {fileID: 600320992}
+  - component: {fileID: 600320993}
   m_Layer: 0
   m_Name: face zone
   m_TagString: Untagged
@@ -1065,6 +1067,18 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
+--- !u!114 &600320993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 600320989}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bb894a56c4496f42bda5bb0bfc26e3b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -1285,6 +1299,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 885722544}
   m_CullTransparentMesh: 1
+--- !u!1 &915427400
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 915427401}
+  m_Layer: 0
+  m_Name: cream anim position
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &915427401
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 915427400}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.04, y: 2.62, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 232417081}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &981634610
 GameObject:
   m_ObjectHideFlags: 0
@@ -1300,7 +1345,7 @@ GameObject:
   - component: {fileID: 981634615}
   m_Layer: 0
   m_Name: cream bottle
-  m_TagString: Untagged
+  m_TagString: Cream
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1425,6 +1470,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2fc97e92802430340b71a51535c3941f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  itemPhase: 0
   dragStartPosition: {fileID: 1135027334}
 --- !u!50 &981634615
 Rigidbody2D:
@@ -2476,14 +2522,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 879d0eaa7531933438decc29ebf02d0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  currentPhase: 0
   hand: {fileID: 1920547947}
   acneSprite: {fileID: 1204008159}
   faceZone: {fileID: 600320991}
-  handStartPosition: {fileID: 246192925}
-  handApplyPosition: {fileID: 600320990}
-  moveSpeed: 5
-  shakeDuration: 0.5
-  shakeMagnitude: 0.1
 --- !u!1 &1694705569
 GameObject:
   m_ObjectHideFlags: 0
@@ -2843,8 +2885,9 @@ GameObject:
   - component: {fileID: 1920547946}
   - component: {fileID: 1920547945}
   - component: {fileID: 1920547943}
-  - component: {fileID: 1920547947}
   - component: {fileID: 1920547948}
+  - component: {fileID: 1920547947}
+  - component: {fileID: 1920547949}
   m_Layer: 0
   m_Name: hand
   m_TagString: Untagged
@@ -2963,6 +3006,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gripPoint: {fileID: 1630956160}
+  moveSpeed: 5
+  startPositionMarker: {fileID: 246192925}
   isDraggable: 0
 --- !u!70 &1920547948
 CapsuleCollider2D:
@@ -3001,6 +3046,22 @@ CapsuleCollider2D:
   m_Offset: {x: -0.19812778, y: -0.25473565}
   m_Size: {x: 2.0440965, y: 3.2405286}
   m_Direction: 0
+--- !u!114 &1920547949
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1920547942}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a84c67f9b42efe8408d507854ab56957, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  applyAnimationPositionMarker: {fileID: 915427401}
+  applyDuration: 1.5
+  applyMagnitude: 0.5
+  applyCycles: 2
 --- !u!1 &1928944487
 GameObject:
   m_ObjectHideFlags: 0

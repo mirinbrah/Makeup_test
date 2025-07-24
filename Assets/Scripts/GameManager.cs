@@ -1,4 +1,3 @@
-// GameManager.cs (Версия для простого HandController)
 using UnityEngine;
 using System.Collections;
 
@@ -6,115 +5,119 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    private enum GameState { Idle, AnimatingToItem, AnimatingToDragPos, PlayerControl, AnimatingToFace, Applying, ReturningSequence }
-    private GameState currentState;
+    [Header("Этапы Игры")]
+    [SerializeField] private GamePhase currentPhase;
 
     [Header("Объекты сцены")]
-    public HandController hand;
+    public HandController hand; // << ОСТАЛАСЬ ТОЛЬКО ОДНА ССЫЛКА
     public GameObject acneSprite;
     public Collider2D faceZone;
 
-    [Header("Маркеры позиций")]
-    public Transform handStartPosition;
-    public Transform handApplyPosition;
-
-    [Header("Настройки")]
-    public float moveSpeed = 5f;
-    public float shakeDuration = 0.5f;
-    public float shakeMagnitude = 0.1f;
-
     private bool isBusy = false;
-    private ClickableItem currentItem;
-    private Vector3 itemReturnPosition;
+    private bool targetReached = false;
 
-    void Awake() { Instance = this; }
+    void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {
-        currentState = GameState.Idle;
-        hand.transform.position = handStartPosition.position;
-        if (acneSprite != null) acneSprite.SetActive(true);
+        currentPhase = GamePhase.Acne;
     }
 
     public void OnItemClicked(ClickableItem item)
     {
-        if (isBusy) return;
-        isBusy = true;
-        currentItem = item;
-        itemReturnPosition = item.transform.position;
-        currentState = GameState.AnimatingToItem;
-        hand.MoveTo(item.transform.position, moveSpeed, OnMovementComplete);
+        if (isBusy || item.itemPhase != currentPhase) return;
+        StartCoroutine(PickupAndPrepareSequence(item));
     }
 
-    public void OnDragEnded(Vector3 dropPosition)
+    public void OnItemReachedTargetZone()
     {
-        if (currentState != GameState.PlayerControl) return;
-        if (faceZone.OverlapPoint(dropPosition))
+        if (!hand.isDraggable) return;
+        targetReached = true;
+    }
+
+    public void OnItemLeftTargetZone()
+    {
+        targetReached = false;
+    }
+
+    public void OnDragEnded()
+    {
+        if (!hand.isDraggable) return;
+
+        if (targetReached)
         {
             hand.isDraggable = false;
-            currentState = GameState.AnimatingToFace;
-            hand.MoveTo(handApplyPosition.position, moveSpeed, OnMovementComplete);
+            StartCoroutine(ApplyAndReturnSequence());
         }
         else
         {
             hand.isDraggable = false;
-            hand.MoveTo(currentItem.dragStartPosition.position, moveSpeed, () => {
+            hand.MoveTo(hand.GetAttachedItem().dragStartPosition.position, () => {
                 hand.isDraggable = true;
             });
         }
+        targetReached = false;
     }
 
-    private void OnMovementComplete()
+    private IEnumerator PickupAndPrepareSequence(ClickableItem item)
     {
-        switch (currentState)
-        {
-            case GameState.AnimatingToItem:
-                hand.AttachItem(currentItem.transform);
-                currentState = GameState.AnimatingToDragPos;
-                hand.MoveTo(currentItem.dragStartPosition.position, moveSpeed, OnMovementComplete);
-                break;
-            case GameState.AnimatingToDragPos:
-                currentState = GameState.PlayerControl;
-                hand.isDraggable = true;
-                break;
-            case GameState.AnimatingToFace:
-                StartCoroutine(ApplyAndReturnSequence());
-                break;
-        }
+        isBusy = true;
+        hand.isDraggable = false;
+        targetReached = false;
+
+        bool finishedMove = false;
+        hand.MoveTo(item.transform.position, () => { finishedMove = true; });
+        yield return new WaitUntil(() => finishedMove);
+
+        hand.AttachItem(item);
+
+        finishedMove = false;
+        hand.MoveTo(item.dragStartPosition.position, () => { finishedMove = true; });
+        yield return new WaitUntil(() => finishedMove);
+
+        hand.isDraggable = true;
     }
 
     private IEnumerator ApplyAndReturnSequence()
     {
-        currentState = GameState.Applying;
-        yield return StartCoroutine(ShakeHand());
-        if (acneSprite != null) acneSprite.SetActive(false);
+        // Получаем аниматор с того же объекта, где и контроллер
+        HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
+        if (handAnimator == null)
+        {
+            Debug.LogError("На объекте руки отсутствует компонент HandAnimator!");
+            isBusy = false;
+            yield break;
+        }
 
-        hand.DetachItem(currentItem.transform);
-        bool finishedMove = false;
-        hand.MoveTo(itemReturnPosition, moveSpeed, () => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
-        currentItem.transform.position = itemReturnPosition;
+        bool animationFinished = false;
+        StartCoroutine(handAnimator.AnimateApplyAndReturn(() => {
+            animationFinished = true;
+        }));
+        yield return new WaitUntil(() => animationFinished);
 
-        finishedMove = false;
-        hand.MoveTo(handStartPosition.position, moveSpeed, () => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
+        if (currentPhase == GamePhase.Acne && acneSprite != null)
+        {
+            acneSprite.SetActive(false);
+        }
 
-        currentState = GameState.Idle;
+        AdvanceToNextPhase();
+
         isBusy = false;
     }
 
-    private IEnumerator ShakeHand()
+    private void AdvanceToNextPhase()
     {
-        Vector3 originalPosition = hand.transform.position;
-        float elapsedTime = 0f;
-        while (elapsedTime < shakeDuration)
+        int nextPhaseIndex = (int)currentPhase + 1;
+        if (nextPhaseIndex < System.Enum.GetValues(typeof(GamePhase)).Length)
         {
-            float x = originalPosition.x + Random.Range(-1f, 1f) * shakeMagnitude;
-            float y = originalPosition.y + Random.Range(-1f, 1f) * shakeMagnitude;
-            hand.transform.position = new Vector3(x, y, originalPosition.z);
-            elapsedTime += Time.deltaTime;
-            yield return null;
+            currentPhase = (GamePhase)nextPhaseIndex;
         }
-        hand.transform.position = originalPosition;
+        else
+        {
+            Debug.Log("Все этапы завершены!");
+        }
     }
 }
