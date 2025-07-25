@@ -1,15 +1,20 @@
 using UnityEngine;
 using System.Collections;
+using System; 
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
+    public static event Action<GamePhase, GameState> OnPhaseStateChanged;
+
     [Header("Этапы Игры")]
     [SerializeField] private GamePhase currentPhase;
 
+    private GameState currentState;
+
     [Header("Объекты сцены")]
-    public HandController hand; // << ОСТАЛАСЬ ТОЛЬКО ОДНА ССЫЛКА
+    public HandController hand;
     public GameObject acneSprite;
     public Collider2D faceZone;
 
@@ -24,6 +29,14 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         currentPhase = GamePhase.Acne;
+        ChangeState(GameState.Idle); 
+    }
+
+    private void ChangeState(GameState newState)
+    {
+        if (currentState == newState) return;
+        currentState = newState;
+        OnPhaseStateChanged?.Invoke(currentPhase, currentState);
     }
 
     public void OnItemClicked(ClickableItem item)
@@ -34,7 +47,7 @@ public class GameManager : MonoBehaviour
 
     public void OnItemReachedTargetZone()
     {
-        if (!hand.isDraggable) return;
+        if (currentState != GameState.PlayerControl) return;
         targetReached = true;
     }
 
@@ -45,7 +58,7 @@ public class GameManager : MonoBehaviour
 
     public void OnDragEnded()
     {
-        if (!hand.isDraggable) return;
+        if (currentState != GameState.PlayerControl) return;
 
         if (targetReached)
         {
@@ -57,9 +70,17 @@ public class GameManager : MonoBehaviour
             hand.isDraggable = false;
             hand.MoveTo(hand.GetAttachedItem().dragStartPosition.position, () => {
                 hand.isDraggable = true;
+                ChangeState(GameState.PlayerControl); // Возвращаемся в состояние контроля
             });
         }
         targetReached = false;
+    }
+
+    // --- ПУБЛИЧНЫЙ МЕТОД ДЛЯ UIManager ---
+    public void PerformReset()
+    {
+        if (currentState != GameState.PlayerControl) return;
+        StartCoroutine(ResetSequence());
     }
 
     private IEnumerator PickupAndPrepareSequence(ClickableItem item)
@@ -67,6 +88,7 @@ public class GameManager : MonoBehaviour
         isBusy = true;
         hand.isDraggable = false;
         targetReached = false;
+        ChangeState(GameState.AnimatingToItem);
 
         bool finishedMove = false;
         hand.MoveTo(item.transform.position, () => { finishedMove = true; });
@@ -75,15 +97,18 @@ public class GameManager : MonoBehaviour
         hand.AttachItem(item);
 
         finishedMove = false;
+        ChangeState(GameState.AnimatingToDragPos);
         hand.MoveTo(item.dragStartPosition.position, () => { finishedMove = true; });
         yield return new WaitUntil(() => finishedMove);
 
         hand.isDraggable = true;
+        ChangeState(GameState.PlayerControl); // << Сообщаем UI, что можно показать кнопку
     }
 
     private IEnumerator ApplyAndReturnSequence()
     {
-        // Получаем аниматор с того же объекта, где и контроллер
+        ChangeState(GameState.Applying);
+        isBusy = true;
         HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator == null)
         {
@@ -104,8 +129,32 @@ public class GameManager : MonoBehaviour
         }
 
         AdvanceToNextPhase();
+        isBusy = false;
+        ChangeState(GameState.Idle);
+    }
+
+    private IEnumerator ResetSequence()
+    {
+        isBusy = true;
+        hand.isDraggable = false;
+        ChangeState(GameState.ReturningSequence);
+
+        HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
+        if (handAnimator == null)
+        {
+            Debug.LogError("На объекте руки отсутствует компонент HandAnimator!");
+            isBusy = false;
+            yield break;
+        }
+
+        bool returnFinished = false;
+        StartCoroutine(handAnimator.AnimateReturnOnly(() => {
+            returnFinished = true;
+        }));
+        yield return new WaitUntil(() => returnFinished);
 
         isBusy = false;
+        ChangeState(GameState.Idle);
     }
 
     private void AdvanceToNextPhase()

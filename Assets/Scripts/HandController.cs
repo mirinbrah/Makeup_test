@@ -1,4 +1,3 @@
-// HandController.cs (Финальная версия)
 using UnityEngine;
 using UnityEngine.EventSystems;
 using System;

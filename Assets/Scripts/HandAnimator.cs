@@ -8,9 +8,8 @@ public class HandAnimator : MonoBehaviour
     public Transform applyAnimationPositionMarker;
 
     [Header("Настройки Анимации 'Нанесение'")]
-    public float applyDuration = 1.5f;
-    public float applyMagnitude = 0.5f;
-    public int applyCycles = 2;
+    public float applyDuration = 1.5f; // Время на один полный круг
+    public float applyRadius = 0.5f;   // Радиус кругового движения
 
     private HandController handController;
 
@@ -23,30 +22,45 @@ public class HandAnimator : MonoBehaviour
     {
         if (applyAnimationPositionMarker == null)
         {
+            Debug.LogError("У HandAnimator не назначен маркер 'applyAnimationPositionMarker'!", this);
             onComplete?.Invoke();
             yield break;
         }
 
         ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null)
+        {
+            Debug.LogError("HandAnimator пытался начать анимацию, но рука ничего не держит.", this);
+            onComplete?.Invoke();
+            yield break;
+        }
+
         Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
 
-        // 1. Движение к точке анимации
+        // 1. Движение к точке анимации (центру будущего круга)
         bool finishedMove = false;
         handController.MoveTo(applyAnimationPositionMarker.position, () => { finishedMove = true; });
         yield return new WaitUntil(() => finishedMove);
 
-        // 2. Анимация покачивания
-        Vector3 originalPosition = transform.position;
+        // 2. АНИМАЦИЯ КРУГОВОГО ДВИЖЕНИЯ
+        Vector3 centerPoint = transform.position; // Запоминаем центр круга
         float elapsedTime = 0f;
+
         while (elapsedTime < applyDuration)
         {
             elapsedTime += Time.deltaTime;
-            float sinWave = Mathf.Sin(elapsedTime / applyDuration * applyCycles * Mathf.PI * 2);
-            float xOffset = sinWave * applyMagnitude;
-            transform.position = originalPosition + new Vector3(xOffset, 0, 0);
+            float angle = (elapsedTime / applyDuration) * 2 * Mathf.PI; // Угол в радианах (от 0 до 2*PI)
+
+            // Вычисляем смещение по X и Y с помощью тригонометрии
+            float xOffset = Mathf.Cos(angle) * applyRadius;
+            float yOffset = Mathf.Sin(angle) * applyRadius;
+
+            // Применяем смещение к центральной точке
+            transform.position = centerPoint + new Vector3(xOffset, yOffset, 0);
+
             yield return null;
         }
-        transform.position = originalPosition;
+        transform.position = centerPoint; // Возвращаем руку точно в центр
 
         // 3. Рука с предметом едет на исходное место предмета
         finishedMove = false;
@@ -58,6 +72,28 @@ public class HandAnimator : MonoBehaviour
         currentItem.transform.position = itemReturnPosition;
 
         // 5. Пустая рука уезжает
+        finishedMove = false;
+        handController.ReturnToStartPosition(() => { finishedMove = true; });
+        yield return new WaitUntil(() => finishedMove);
+
+        onComplete?.Invoke();
+    }
+
+    public IEnumerator AnimateReturnOnly(Action onComplete)
+    {
+        // Этот метод остается без изменений
+        ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null) { onComplete?.Invoke(); yield break; }
+
+        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
+
+        bool finishedMove = false;
+        handController.MoveTo(itemReturnPosition, () => { finishedMove = true; });
+        yield return new WaitUntil(() => finishedMove);
+
+        handController.DetachItem();
+        currentItem.transform.position = itemReturnPosition;
+
         finishedMove = false;
         handController.ReturnToStartPosition(() => { finishedMove = true; });
         yield return new WaitUntil(() => finishedMove);
