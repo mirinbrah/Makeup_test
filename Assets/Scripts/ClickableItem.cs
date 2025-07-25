@@ -7,7 +7,7 @@ public class ClickableItem : MonoBehaviour, IPointerClickHandler
     public GamePhase itemPhase;
     public Transform dragStartPosition;
 
-    private Vector3 originalPosition;
+    public Vector3 originalPosition;
 
     void Awake()
     {

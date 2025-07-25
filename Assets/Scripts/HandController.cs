@@ -7,7 +7,7 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     [Header("Настройки Руки")]
     public Transform gripPoint;
     public float moveSpeed = 5f;
-    public Transform startPositionMarker; 
+    public Transform startPositionMarker;
 
     private ClickableItem attachedItem;
     private Vector3 autoTargetPosition;
@@ -29,7 +29,6 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
 
     void Start()
     {
-        // При старте игры рука сразу перемещается на свою стартовую позицию
         if (startPositionMarker != null)
         {
             transform.position = startPositionMarker.position;
@@ -62,7 +61,6 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         isMovingAutomated = true;
     }
 
-    // Новый метод для возврата на стартовую позицию
     public void ReturnToStartPosition(Action onCompleteCallback)
     {
         if (startPositionMarker != null)
@@ -71,7 +69,7 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         }
         else
         {
-            onCompleteCallback?.Invoke(); // Сразу завершаем, если нет маркера
+            onCompleteCallback?.Invoke();
         }
     }
 

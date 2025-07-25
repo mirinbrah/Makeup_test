@@ -1,6 +1,6 @@
 using UnityEngine;
-using System.Collections;
 using System;
+using System.Collections;
 
 public class HandAnimator : MonoBehaviour
 {
@@ -8,96 +8,98 @@ public class HandAnimator : MonoBehaviour
     public Transform applyAnimationPositionMarker;
 
     [Header("Настройки Анимации 'Нанесение'")]
-    public float applyDuration = 1.5f; // Время на один полный круг
-    public float applyRadius = 0.5f;   // Радиус кругового движения
+    public float applyDuration = 1.5f;
+    public float applyRadius = 0.5f;
 
     private HandController handController;
+    private Action onAnimationComplete;
 
     void Awake()
     {
         handController = GetComponent<HandController>();
     }
 
-    public IEnumerator AnimateApplyAndReturn(Action onComplete)
+    // Главный метод, который запускает всю цепочку анимации
+    public void AnimateApplyAndReturn(Action onComplete)
     {
-        if (applyAnimationPositionMarker == null)
-        {
-            Debug.LogError("У HandAnimator не назначен маркер 'applyAnimationPositionMarker'!", this);
-            onComplete?.Invoke();
-            yield break;
-        }
+        onAnimationComplete = onComplete;
 
         ClickableItem currentItem = handController.GetAttachedItem();
-        if (currentItem == null)
+        if (currentItem == null || applyAnimationPositionMarker == null)
         {
-            Debug.LogError("HandAnimator пытался начать анимацию, но рука ничего не держит.", this);
-            onComplete?.Invoke();
-            yield break;
+            Debug.LogError("HandAnimator не может начать анимацию: нет предмета или маркера позиции!");
+            onAnimationComplete?.Invoke();
+            return;
         }
 
-        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
+        // Шаг 1: Двигаемся к точке анимации. По завершении вызываем Step2_CircularMovement.
+        handController.MoveTo(applyAnimationPositionMarker.position, Step2_CircularMovement);
+    }
 
-        // 1. Движение к точке анимации (центру будущего круга)
-        bool finishedMove = false;
-        handController.MoveTo(applyAnimationPositionMarker.position, () => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
+    // Шаг 2: Выполняем круговое движение.
+    private void Step2_CircularMovement()
+    {
+        StartCoroutine(CircularMovementCoroutine(Step3_ReturnItem));
+    }
 
-        // 2. АНИМАЦИЯ КРУГОВОГО ДВИЖЕНИЯ
-        Vector3 centerPoint = transform.position; // Запоминаем центр круга
+    // Корутина для самой анимации вращения. По завершении вызывает следующий шаг.
+    private IEnumerator CircularMovementCoroutine(Action onComplete)
+    {
+        Vector3 centerPoint = transform.position;
         float elapsedTime = 0f;
 
         while (elapsedTime < applyDuration)
         {
             elapsedTime += Time.deltaTime;
-            float angle = (elapsedTime / applyDuration) * 2 * Mathf.PI; // Угол в радианах (от 0 до 2*PI)
-
-            // Вычисляем смещение по X и Y с помощью тригонометрии
+            float angle = (elapsedTime / applyDuration) * 2 * Mathf.PI;
             float xOffset = Mathf.Cos(angle) * applyRadius;
             float yOffset = Mathf.Sin(angle) * applyRadius;
-
-            // Применяем смещение к центральной точке
             transform.position = centerPoint + new Vector3(xOffset, yOffset, 0);
-
             yield return null;
         }
-        transform.position = centerPoint; // Возвращаем руку точно в центр
-
-        // 3. Рука с предметом едет на исходное место предмета
-        finishedMove = false;
-        handController.MoveTo(itemReturnPosition, () => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
-
-        // 4. Рука отпускает предмет
-        handController.DetachItem();
-        currentItem.transform.position = itemReturnPosition;
-
-        // 5. Пустая рука уезжает
-        finishedMove = false;
-        handController.ReturnToStartPosition(() => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
-
+        transform.position = centerPoint;
         onComplete?.Invoke();
     }
 
-    public IEnumerator AnimateReturnOnly(Action onComplete)
+    // Шаг 3: Возвращаем предмет на место.
+    private void Step3_ReturnItem()
     {
-        // Этот метод остается без изменений
         ClickableItem currentItem = handController.GetAttachedItem();
-        if (currentItem == null) { onComplete?.Invoke(); yield break; }
+        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
+
+        // Двигаем руку с предметом на его исходное место. По завершении вызываем Step4_DetachAndLeave.
+        handController.MoveTo(itemReturnPosition, () => Step4_DetachAndLeave(currentItem, itemReturnPosition));
+    }
+
+    // Шаг 4: Отсоединяем предмет и уводим руку.
+    private void Step4_DetachAndLeave(ClickableItem item, Vector3 position)
+    {
+        handController.DetachItem();
+        item.transform.position = position;
+
+        // Возвращаем пустую руку на старт. По завершении вызываем финальный колбэк.
+        handController.ReturnToStartPosition(onAnimationComplete);
+    }
+
+    // Метод для простого возврата (для кнопки Reset)
+    public void AnimateReturnOnly(Action onComplete)
+    {
+        ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null)
+        {
+            onComplete?.Invoke();
+            return;
+        }
 
         Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
 
-        bool finishedMove = false;
-        handController.MoveTo(itemReturnPosition, () => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
-
-        handController.DetachItem();
-        currentItem.transform.position = itemReturnPosition;
-
-        finishedMove = false;
-        handController.ReturnToStartPosition(() => { finishedMove = true; });
-        yield return new WaitUntil(() => finishedMove);
-
-        onComplete?.Invoke();
+        // Двигаем руку с предметом
+        handController.MoveTo(itemReturnPosition, () => {
+            // Отсоединяем
+            handController.DetachItem();
+            currentItem.transform.position = itemReturnPosition;
+            // Уводим пустую руку
+            handController.ReturnToStartPosition(onComplete);
+        });
     }
 }
