@@ -1,35 +1,41 @@
-// MakeupDatabase.cs
 using UnityEngine;
 using System.Collections.Generic;
 
-// Это обычный MonoBehaviour, который можно повесить на любой объект в сцене
 public class MakeupDatabase : MonoBehaviour
 {
-    // Внутренний класс для удобной настройки в инспекторе
     [System.Serializable]
     public class MakeupMapping
     {
-        [Tooltip("Объект-источник цвета в палетке (перетащить из сцены)")]
         public ColorSource keyColorSource;
-        [Tooltip("Объект на лице, который соответствует этому источнику (перетащить из сцены)")]
         public GameObject faceObject;
     }
 
-    // Список всех наших соответствий
     public List<MakeupMapping> blushMappings;
+    public List<MakeupMapping> eyeshadowMappings;
 
-    // Вспомогательный метод для поиска нужного объекта на лице
-    public GameObject GetFaceObjectFor(ColorSource source)
+    public GameObject GetFaceObjectFor(ColorSource source, GamePhase phase)
     {
-        // Ищем в списке соответствие, где ключ совпадает с переданным источником
-        MakeupMapping foundMapping = blushMappings.Find(m => m.keyColorSource == source);
+        List<MakeupMapping> listToSearch = null;
 
-        if (foundMapping != null)
+        switch (phase)
         {
-            return foundMapping.faceObject;
+            case GamePhase.Blush:
+                listToSearch = blushMappings;
+                break;
+            case GamePhase.Eyeshadow:
+                listToSearch = eyeshadowMappings;
+                break;
         }
 
-        // Если ничего не найдено, возвращаем null
+        if (listToSearch != null)
+        {
+            MakeupMapping foundMapping = listToSearch.Find(m => m.keyColorSource == source);
+            if (foundMapping != null)
+            {
+                return foundMapping.faceObject;
+            }
+        }
+
         return null;
     }
 }

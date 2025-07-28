@@ -11,12 +11,12 @@ public class HandAnimator : MonoBehaviour
     public float creamApplyDuration = 1.5f;
     public float creamApplyRadius = 0.5f;
 
-    [Header("Настройки Анимации 'Румяна'")]
-    public float blushRotationAngle = 45f;
-    public float blushRotationDuration = 0.3f;
-    public float blushDabDuration = 1.0f;
-    public float blushDabDistance = 0.1f;
-    public float blushDabSpeed = 15f;
+    [Header("Настройки Анимации 'Макияж'")]
+    public float makeupRotationAngle = 45f;
+    public float makeupRotationDuration = 0.3f;
+    public float makeupDabDuration = 1.0f;
+    public float makeupDabDistance = 0.1f;
+    public float makeupDabSpeed = 15f;
 
     private HandController handController;
     private Action onSequenceComplete;
@@ -27,21 +27,20 @@ public class HandAnimator : MonoBehaviour
         handController = GetComponent<HandController>();
     }
 
-    public void AnimateBlushPickup(Vector3 palettePosition, Action onComplete)
+    public void AnimateMakeupPickup(Vector3 palettePosition, Action onComplete)
     {
         onSequenceComplete = onComplete;
         animationTargetPosition = palettePosition;
-        StartCoroutine(RotateCoroutine(blushRotationAngle, blushRotationDuration, () => {
+        StartCoroutine(RotateCoroutine(makeupRotationAngle, makeupRotationDuration, () => {
             MoveToPalette(() => {
-                StartCoroutine(DabCoroutine(() => {
-                    StartCoroutine(RotateCoroutine(0, blushRotationDuration, onSequenceComplete));
+                StartCoroutine(DabCoroutine(makeupDabDuration, () => {
+                    StartCoroutine(RotateCoroutine(0, makeupRotationDuration, onSequenceComplete));
                 }));
             });
         }));
     }
 
-    // --- ИЗМЕНЕННЫЙ МЕТОД ---
-    public void AnimateBlushApplication(Vector3 facePosition, Action onApplicationComplete, Action onSequenceFinished)
+    public void AnimateMakeupApplication(Vector3 facePosition, Action onApplicationComplete, Action onSequenceFinished)
     {
         animationTargetPosition = facePosition;
         MoveToFaceTarget(() => {
@@ -67,30 +66,22 @@ public class HandAnimator : MonoBehaviour
         handController.MoveTo(finalHandPosition, onComplete);
     }
 
-    // --- ИЗМЕНЕННЫЙ МЕТОД ---
     private void PerformFaceDabAnimation(Action onApplicationComplete, Action onSequenceFinished)
     {
-        StartCoroutine(DabCoroutine(() => {
-            // Сразу после "возюканья" на лице:
-            // 1. Вызываем первый колбэк (чтобы GameManager включил румяна)
+        StartCoroutine(DabCoroutine(makeupDabDuration, () => {
             onApplicationComplete?.Invoke();
-
-            // 2. Сбрасываем цвет кисточки
             BrushTool currentTool = handController.GetAttachedTool();
             if (currentTool != null)
             {
                 currentTool.SetTipColor(Color.white);
             }
-
-            // 3. Начинаем возврат кисточки, передавая ему ВТОРОЙ колбэк
             ReturnBrushToOriginalPosition(onSequenceFinished);
         }));
     }
 
-    // --- ИЗМЕНЕННЫЙ МЕТОД ---
     private void ReturnBrushToOriginalPosition(Action onSequenceFinished)
     {
-        onSequenceComplete = onSequenceFinished; // Сохраняем финальный колбэк
+        onSequenceComplete = onSequenceFinished;
         BrushTool currentTool = handController.GetAttachedTool();
         if (currentTool == null) { onSequenceComplete?.Invoke(); return; }
         handController.MoveTo(currentTool.GetOriginalPosition(), DetachBrushAndRetreatHand);
@@ -154,17 +145,17 @@ public class HandAnimator : MonoBehaviour
         onComplete?.Invoke();
     }
 
-    private IEnumerator DabCoroutine(Action onComplete)
+    private IEnumerator DabCoroutine(float duration, Action onComplete)
     {
         BrushTool currentTool = handController.GetAttachedTool();
         if (currentTool == null || currentTool.tipTransform == null) { onComplete?.Invoke(); yield break; }
         Vector3 handToTipOffset = currentTool.tipTransform.position - transform.position;
         Vector3 handCenterPoint = animationTargetPosition - handToTipOffset;
         float elapsedTime = 0f;
-        while (elapsedTime < blushDabDuration)
+        while (elapsedTime < duration)
         {
             elapsedTime += Time.deltaTime;
-            float xOffset = Mathf.Sin(Time.time * blushDabSpeed) * blushDabDistance;
+            float xOffset = Mathf.Sin(Time.time * makeupDabSpeed) * makeupDabDistance;
             transform.position = handCenterPoint + new Vector3(xOffset, 0, 0);
             yield return null;
         }

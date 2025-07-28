@@ -1,7 +1,7 @@
-using UnityEngine;
-using UnityEngine.EventSystems;
 using System;
 using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class GameManager : MonoBehaviour
 {
@@ -28,6 +28,10 @@ public class GameManager : MonoBehaviour
     public BrushTool blushBrush;
     public Transform blushApplyPositionMarker;
 
+    [Header("Объекты для фазы Теней")]
+    public BrushTool eyeshadowBrush;
+    public Transform eyeshadowApplyPositionMarker;
+
     private GamePhase currentPhase;
     private GameState currentState;
 
@@ -42,6 +46,10 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        if (eventSystem == null)
+        {
+            eventSystem = FindFirstObjectByType<EventSystem>();
+        }
         SwitchToPhase(GamePhase.Acne, true);
     }
 
@@ -193,25 +201,49 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void OnBlushColorSelected(ColorSource selectedColor)
+    public void OnMakeupColorSelected(ColorSource selectedColor)
     {
-        if (isBusy || currentPhase != GamePhase.Blush) return;
+        if (isBusy || currentPhase != selectedColor.itemPhase) return;
+
+        BrushTool currentBrush = null;
+        Transform currentApplyMarker = null;
+
+        if (currentPhase == GamePhase.Blush)
+        {
+            currentBrush = blushBrush;
+            currentApplyMarker = blushApplyPositionMarker;
+        }
+        else if (currentPhase == GamePhase.Eyeshadow)
+        {
+            currentBrush = eyeshadowBrush;
+            currentApplyMarker = eyeshadowApplyPositionMarker;
+        }
+
+        if (currentBrush == null || currentApplyMarker == null)
+        {
+            Debug.LogError("Инструменты для фазы " + currentPhase + " не настроены в GameManager!");
+            return;
+        }
+
         SetBusyState(true);
         activeColorSource = selectedColor;
         ChangeState(GameState.Applying, currentPhase);
-        hand.MoveTo(blushBrush.gripPoint.position, () =>
-        {
-            hand.AttachTool(blushBrush);
-            HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
-            handAnimator.AnimateBlushPickup(selectedColor.transform.position, () => {
-                blushBrush.SetTipColor(selectedColor.itemColor);
 
-                handAnimator.AnimateBlushApplication(
-                    blushApplyPositionMarker.position,
+        hand.MoveTo(currentBrush.gripPoint.position, () =>
+        {
+            hand.AttachTool(currentBrush);
+            HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
+
+            handAnimator.AnimateMakeupPickup(selectedColor.transform.position, () => {
+
+                currentBrush.SetTipColor(selectedColor.itemColor);
+
+                handAnimator.AnimateMakeupApplication(
+                    currentApplyMarker.position,
                     () => {
                         if (makeupDatabase != null)
                         {
-                            GameObject faceObject = makeupDatabase.GetFaceObjectFor(activeColorSource);
+                            GameObject faceObject = makeupDatabase.GetFaceObjectFor(activeColorSource, currentPhase);
                             if (faceObject != null)
                             {
                                 faceObject.SetActive(true);
