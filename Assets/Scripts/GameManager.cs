@@ -1,5 +1,6 @@
-using UnityEngine;
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
@@ -14,6 +15,11 @@ public class GameManager : MonoBehaviour
 
     private bool isBusy = false;
     private bool targetReached = false;
+
+    [Header("Интерактивные вкладки")]
+    public GameObject creamTabVisual; 
+    public GameObject makeupTabsContainer; 
+    public List<TabsSwitcher> makeupTabs;
 
     void Awake()
     {
@@ -36,6 +42,29 @@ public class GameManager : MonoBehaviour
         if (!forceChange && (isBusy || currentPhase == newPhase)) return;
         currentPhase = newPhase;
         ChangeState(GameState.Idle, newPhase);
+        UpdateTabsVisual(newPhase);
+    }
+
+    private void UpdateTabsVisual(GamePhase activePhase)
+    {
+        bool isCreamPhase = (activePhase == GamePhase.Acne);
+
+        if (creamTabVisual != null)
+        {
+            creamTabVisual.SetActive(isCreamPhase);
+        }
+        if (makeupTabsContainer != null)
+        {
+            makeupTabsContainer.SetActive(!isCreamPhase);
+        }
+        if (!isCreamPhase)
+        {
+            foreach (var tabActivator in makeupTabs)
+            {
+                bool isActive = (tabActivator.phase == activePhase);
+                tabActivator.UpdateVisual(isActive);
+            }
+        }
     }
 
     public void OnItemClicked(ClickableItem item)
