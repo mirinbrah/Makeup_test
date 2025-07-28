@@ -21,6 +21,9 @@ public class GameManager : MonoBehaviour
     public GameObject makeupTabsContainer; 
     public List<TabsSwitcher> makeupTabs;
 
+    [Header("Объекты для фазы Румян")]
+    public BrushTool blushBrush;
+
     void Awake()
     {
         Instance = this;
@@ -165,5 +168,41 @@ public class GameManager : MonoBehaviour
                 ChangeState(GameState.Idle, currentPhase);
             });
         }
+    }
+
+    public void OnBlushColorSelected(ColorSource selectedColor)
+    {
+        // Проверяем, что мы в нужной фазе и не заняты другой анимацией
+        if (isBusy || currentPhase != GamePhase.Blush || selectedColor.itemPhase != GamePhase.Blush)
+        {
+            return;
+        }
+
+        Debug.Log("Начинаем последовательность для румян. Выбран цвет: " + selectedColor.itemColor);
+        isBusy = true;
+        hand.isDraggable = false;
+        ChangeState(GameState.AnimatingToItem, currentPhase); // Меняем состояние на "анимация"
+
+        // --- НАЧАЛО ПОСЛЕДОВАТЕЛЬНОСТИ ДЕЙСТВИЙ ---
+
+        // Шаг 1: Рука двигается к кисточке
+        hand.MoveTo(blushBrush.gripPoint.position, () =>
+        {
+            // Шаг 2: Рука "берет" кисточку
+            hand.AttachTool(blushBrush);
+            Debug.Log("Кисточка взята.");
+
+            // --- ЗДЕСЬ ПОКА ОСТАНОВИМСЯ ---
+            // В будущем здесь будет продолжение: движение к палетке, потом к лицу.
+            // Пока что мы просто завершаем последовательность для проверки.
+            isBusy = false;
+            // Можно, например, сразу перевести руку в состояние PlayerControl для теста
+            // hand.isDraggable = true;
+            // ChangeState(GameState.PlayerControl, currentPhase);
+
+            // Или просто вернуть в состояние Idle
+            ChangeState(GameState.Idle, currentPhase);
+            Debug.Log("Первая часть последовательности завершена.");
+        });
     }
 }

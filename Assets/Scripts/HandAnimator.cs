@@ -74,7 +74,7 @@ public class HandAnimator : MonoBehaviour
     // Шаг 4: Отсоединяем предмет и уводим руку.
     private void Step4_DetachAndLeave(ClickableItem item, Vector3 position)
     {
-        handController.DetachItem();
+        handController.DetachAll();
         item.transform.position = position;
 
         // Возвращаем пустую руку на старт. По завершении вызываем финальный колбэк.
@@ -96,7 +96,7 @@ public class HandAnimator : MonoBehaviour
         // Двигаем руку с предметом
         handController.MoveTo(itemReturnPosition, () => {
             // Отсоединяем
-            handController.DetachItem();
+            handController.DetachAll();
             currentItem.transform.position = itemReturnPosition;
             // Уводим пустую руку
             handController.ReturnToStartPosition(onComplete);
