@@ -1,32 +1,54 @@
+using UnityEngine;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
     public static event Action<GamePhase, GameState> OnPhaseStateChanged;
 
+    [Header("Состояние игры")]
     [SerializeField] private GamePhase currentPhase;
     private GameState currentState;
 
+    [Header("Основные ссылки")]
     public HandController hand;
     public GameObject acneSprite;
 
-    private bool isBusy = false;
-    private bool targetReached = false;
-
-    [Header("Интерактивные вкладки")]
-    public GameObject creamTabVisual; 
-    public GameObject makeupTabsContainer; 
+    // --- ВОТ ПРАВИЛЬНЫЙ БЛОК УПРАВЛЕНИЯ ВКЛАДКАМИ ---
+    [Header("Управление вкладками")]
+    [Tooltip("Объект, представляющий вкладку с кремом и ее контент")]
+    public GameObject creamTab;
+    [Tooltip("Контейнер для всех вкладок макияжа (румяна, помада и т.д.)")]
+    public GameObject makeupTabsContainer;
+    [Tooltip("Список переключателей для вкладок ВНУТРИ контейнера макияжа")]
     public List<TabsSwitcher> makeupTabs;
+    // ----------------------------------------------------
+
+    [Header("Базы данных и Зоны")]
+    public MakeupDatabase makeupDatabase;
 
     [Header("Объекты для фазы Румян")]
     public BrushTool blushBrush;
+    public Transform blushApplyPositionMarker;
+
+    private bool isBusy = false;
+    private bool targetReached = false;
+    private ColorSource activeColorSource;
 
     void Awake()
     {
         Instance = this;
+        if (makeupDatabase != null)
+        {
+            foreach (var mapping in makeupDatabase.blushMappings)
+            {
+                if (mapping.faceObject != null)
+                {
+                    mapping.faceObject.SetActive(false);
+                }
+            }
+        }
     }
 
     void Start()
@@ -34,7 +56,7 @@ public class GameManager : MonoBehaviour
         SwitchToPhase(GamePhase.Acne, true);
     }
 
-    private void ChangeState(GameState newState, GamePhase phaseForEvent)
+    public void ChangeState(GameState newState, GamePhase phaseForEvent)
     {
         currentState = newState;
         OnPhaseStateChanged?.Invoke(phaseForEvent, currentState);
@@ -43,42 +65,38 @@ public class GameManager : MonoBehaviour
     public void SwitchToPhase(GamePhase newPhase, bool forceChange = false)
     {
         if (!forceChange && (isBusy || currentPhase == newPhase)) return;
+
         currentPhase = newPhase;
         ChangeState(GameState.Idle, newPhase);
         UpdateTabsVisual(newPhase);
     }
 
+    // --- ВОТ ПРАВИЛЬНЫЙ МЕТОД УПРАВЛЕНИЯ ГИБРИДНОЙ СИСТЕМОЙ ВКЛАДОК ---
     private void UpdateTabsVisual(GamePhase activePhase)
     {
+        // 1. Переключаем видимость главных контейнеров
         bool isCreamPhase = (activePhase == GamePhase.Acne);
+        if (creamTab != null) creamTab.SetActive(isCreamPhase);
+        if (makeupTabsContainer != null) makeupTabsContainer.SetActive(!isCreamPhase);
 
-        if (creamTabVisual != null)
-        {
-            creamTabVisual.SetActive(isCreamPhase);
-        }
-        if (makeupTabsContainer != null)
-        {
-            makeupTabsContainer.SetActive(!isCreamPhase);
-        }
+        // 2. Если мы в фазе макияжа, обновляем состояние вкладок внутри контейнера
         if (!isCreamPhase)
         {
-            foreach (var tabActivator in makeupTabs)
+            foreach (var tab in makeupTabs)
             {
-                bool isActive = (tabActivator.phase == activePhase);
-                tabActivator.UpdateVisual(isActive);
+                bool isActive = (tab.phase == activePhase);
+                tab.UpdateVisual(isActive);
             }
         }
     }
+    // --------------------------------------------------------------------
 
     public void OnItemClicked(ClickableItem item)
     {
         if (isBusy || item.itemPhase != currentPhase) return;
-
         isBusy = true;
         hand.isDraggable = false;
-        targetReached = false;
         ChangeState(GameState.AnimatingToItem, currentPhase);
-
         hand.MoveTo(item.transform.position, () => {
             hand.AttachItem(item);
             hand.MoveTo(item.dragStartPosition.position, () => {
@@ -95,19 +113,19 @@ public class GameManager : MonoBehaviour
     public void OnDragEnded()
     {
         if (isBusy) return;
-
         if (targetReached)
         {
             hand.isDraggable = false;
-            ApplyAction();
+            if (currentPhase == GamePhase.Acne)
+            {
+                ApplyAction();
+            }
         }
         else
         {
-            ClickableItem item = hand.GetAttachedItem();
-            if (item != null)
+            if (hand.GetAttachedItem() != null)
             {
-                hand.isDraggable = false;
-                hand.MoveTo(item.dragStartPosition.position, () => {
+                hand.GetComponent<HandAnimator>().AnimateItemReturn(() => {
                     hand.isDraggable = true;
                     ChangeState(GameState.PlayerControl, currentPhase);
                 });
@@ -126,16 +144,10 @@ public class GameManager : MonoBehaviour
     {
         isBusy = true;
         ChangeState(GameState.Applying, currentPhase);
-
         HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator != null)
         {
             handAnimator.AnimateCreamApplication(OnApplySequenceFinished);
-        }
-        else
-        {
-            Debug.LogError("HandAnimator не найден!");
-            OnApplySequenceFinished();
         }
     }
 
@@ -159,7 +171,6 @@ public class GameManager : MonoBehaviour
         isBusy = true;
         hand.isDraggable = false;
         ChangeState(GameState.ReturningSequence, currentPhase);
-
         HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator != null)
         {
@@ -172,52 +183,39 @@ public class GameManager : MonoBehaviour
 
     public void OnBlushColorSelected(ColorSource selectedColor)
     {
-        // Проверяем, что мы в нужной фазе и не заняты другой анимацией
-        if (isBusy || currentPhase != GamePhase.Blush || selectedColor.itemPhase != GamePhase.Blush)
-        {
-            return;
-        }
-
-        Debug.Log("Начинаем последовательность для румян. Выбран цвет: " + selectedColor.itemColor);
+        if (isBusy || currentPhase != GamePhase.Blush) return;
         isBusy = true;
-        hand.isDraggable = false;
-        ChangeState(GameState.AnimatingToItem, currentPhase);
-
-        // --- НАЧАЛО ПОСЛЕДОВАТЕЛЬНОСТИ ДЕЙСТВИЙ ---
-
-        // Шаг 1: Рука двигается к кисточке
+        activeColorSource = selectedColor;
+        ChangeState(GameState.Applying, currentPhase);
         hand.MoveTo(blushBrush.gripPoint.position, () =>
         {
-            // Шаг 2: Рука "берет" кисточку
             hand.AttachTool(blushBrush);
-            Debug.Log("Кисточка взята.");
-
-            // Шаг 3: Запускаем анимацию взятия цвета из палетки
             HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
-            if (handAnimator != null)
-            {
-                // Вызываем переименованный метод AnimateBlushPickup
-                handAnimator.AnimateBlushPickup(selectedColor.transform.position, () => {
+            handAnimator.AnimateBlushPickup(selectedColor.transform.position, () => {
+                blushBrush.SetTipColor(selectedColor.itemColor);
 
-                    // Шаг 4: Анимация завершена. Окрашиваем кончик кисточки.
-                    blushBrush.SetTipColor(selectedColor.itemColor);
-                    Debug.Log("Кисточка окрашена в цвет: " + selectedColor.itemColor);
-
-                    // Шаг 5: Передаем управление игроку
-                    // (В будущем здесь может быть движение руки в позицию готовности)
-                    isBusy = false;
-                    hand.isDraggable = true;
-                    ChangeState(GameState.PlayerControl, currentPhase);
-                    Debug.Log("Последовательность завершена. Можно перетаскивать кисточку.");
-                });
-            }
-            else
-            {
-                Debug.LogError("HandAnimator не найден на объекте руки!");
-                // Аварийное завершение, если аниматор не найден
-                isBusy = false;
-                ChangeState(GameState.Idle, currentPhase);
-            }
+                // --- ИЗМЕНЕННЫЙ ВЫЗОВ ---
+                handAnimator.AnimateBlushApplication(
+                    blushApplyPositionMarker.position,
+                    // 1. Что делать СРАЗУ ПОСЛЕ нанесения:
+                    () => {
+                        if (makeupDatabase != null)
+                        {
+                            GameObject faceObject = makeupDatabase.GetFaceObjectFor(activeColorSource);
+                            if (faceObject != null)
+                            {
+                                faceObject.SetActive(true);
+                            }
+                        }
+                    },
+                    // 2. Что делать ПОСЛЕ ВОЗВРАТА кисточки:
+                    () => {
+                        activeColorSource = null;
+                        isBusy = false;
+                        ChangeState(GameState.Idle, currentPhase);
+                    }
+                );
+            });
         });
     }
 }

@@ -27,120 +27,111 @@ public class HandAnimator : MonoBehaviour
         handController = GetComponent<HandController>();
     }
 
-    #region Анимации для Румян
-
-    /// <summary>
-    /// Запускает полную последовательность анимации для взятия румян из палетки.
-    /// </summary>
     public void AnimateBlushPickup(Vector3 palettePosition, Action onComplete)
     {
         onSequenceComplete = onComplete;
         animationTargetPosition = palettePosition;
-
-        // Начинаем с поворота руки, по завершении которого вызывается следующий метод в цепочке.
-        StartCoroutine(RotateCoroutine(blushRotationAngle, blushRotationDuration, MoveToPalette));
+        StartCoroutine(RotateCoroutine(blushRotationAngle, blushRotationDuration, () => {
+            MoveToPalette(() => {
+                StartCoroutine(DabCoroutine(() => {
+                    StartCoroutine(RotateCoroutine(0, blushRotationDuration, onSequenceComplete));
+                }));
+            });
+        }));
     }
 
-    // Вызывается после завершения начального поворота.
-    private void MoveToPalette()
+    // --- ИЗМЕНЕННЫЙ МЕТОД ---
+    public void AnimateBlushApplication(Vector3 facePosition, Action onApplicationComplete, Action onSequenceFinished)
     {
-        // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        animationTargetPosition = facePosition;
+        MoveToFaceTarget(() => {
+            PerformFaceDabAnimation(onApplicationComplete, onSequenceFinished);
+        });
+    }
 
-        // 1. Получаем текущий инструмент, чтобы найти его кончик
+    private void MoveToPalette(Action onComplete)
+    {
         BrushTool currentTool = handController.GetAttachedTool();
-        if (currentTool == null || currentTool.tipTransform == null)
-        {
-            Debug.LogError("Невозможно рассчитать позицию для движения: не найден инструмент или его кончик (tipTransform)!");
-            onSequenceComplete?.Invoke(); // Безопасно завершаем анимацию
-            return;
-        }
-
-        // 2. Вычисляем вектор смещения от ЦЕНТРА РУКИ до КОНЧИКА КИСТОЧКИ.
-        // Этот вектор показывает, "где находится кончик относительно руки".
+        if (currentTool == null || currentTool.tipTransform == null) { onComplete?.Invoke(); return; }
         Vector3 handToTipOffset = currentTool.tipTransform.position - transform.position;
-
-        // 3. Вычисляем ФИНАЛЬНУЮ ПОЗИЦИЮ для РУКИ.
-        // Цель: animationTargetPosition (центр цвета)
-        // Мы хотим, чтобы КОНЧИК оказался на цели. Значит, РУКА должна быть в точке (цель - смещение).
         Vector3 finalHandPosition = animationTargetPosition - handToTipOffset;
-
-        // 4. Говорим руке плавно двигаться в эту новую, правильно рассчитанную точку.
-        handController.MoveTo(finalHandPosition, PerformDabAnimation);
-
-        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+        handController.MoveTo(finalHandPosition, onComplete);
     }
 
-    // Вызывается после прибытия к палетке.
-    private void PerformDabAnimation()
+    private void MoveToFaceTarget(Action onComplete)
     {
-        StartCoroutine(DabCoroutine(FinalizeBlushPickup));
+        BrushTool currentTool = handController.GetAttachedTool();
+        if (currentTool == null || currentTool.tipTransform == null) { onComplete?.Invoke(); return; }
+        Vector3 handToTipOffset = currentTool.tipTransform.position - transform.position;
+        Vector3 finalHandPosition = animationTargetPosition - handToTipOffset;
+        handController.MoveTo(finalHandPosition, onComplete);
     }
 
-    // Вызывается после завершения "возюканья".
-    private void FinalizeBlushPickup()
+    // --- ИЗМЕНЕННЫЙ МЕТОД ---
+    private void PerformFaceDabAnimation(Action onApplicationComplete, Action onSequenceFinished)
     {
-        // Возвращаем руку в исходный поворот и по завершении вызываем финальный колбэк.
-        StartCoroutine(RotateCoroutine(0, blushRotationDuration, onSequenceComplete));
+        StartCoroutine(DabCoroutine(() => {
+            // Сразу после "возюканья" на лице:
+            // 1. Вызываем первый колбэк (чтобы GameManager включил румяна)
+            onApplicationComplete?.Invoke();
+
+            // 2. Сбрасываем цвет кисточки
+            BrushTool currentTool = handController.GetAttachedTool();
+            if (currentTool != null)
+            {
+                currentTool.SetTipColor(Color.white);
+            }
+
+            // 3. Начинаем возврат кисточки, передавая ему ВТОРОЙ колбэк
+            ReturnBrushToOriginalPosition(onSequenceFinished);
+        }));
     }
 
-    #endregion
-
-    #region Анимации для Крема
-
-    /// <summary>
-    /// Запускает полную последовательность анимации нанесения крема.
-    /// </summary>
-    public void AnimateCreamApplication(Action onComplete)
+    // --- ИЗМЕНЕННЫЙ МЕТОД ---
+    private void ReturnBrushToOriginalPosition(Action onSequenceFinished)
     {
-        onSequenceComplete = onComplete;
-
-        ClickableItem currentItem = handController.GetAttachedItem();
-        if (currentItem == null || applyAnimationPositionMarker == null)
-        {
-            Debug.LogError("HandAnimator не может начать анимацию крема: нет предмета или маркера позиции!");
-            onSequenceComplete?.Invoke();
-            return;
-        }
-        handController.MoveTo(applyAnimationPositionMarker.position, PerformCreamApplicationAnimation);
+        onSequenceComplete = onSequenceFinished; // Сохраняем финальный колбэк
+        BrushTool currentTool = handController.GetAttachedTool();
+        if (currentTool == null) { onSequenceComplete?.Invoke(); return; }
+        handController.MoveTo(currentTool.GetOriginalPosition(), DetachBrushAndRetreatHand);
     }
 
-    // Вызывается после прибытия к точке нанесения крема.
-    private void PerformCreamApplicationAnimation()
-    {
-        StartCoroutine(CreamCircularMovementCoroutine(InitiateCreamItemReturn));
-    }
-
-    // Вызывается после завершения круговой анимации.
-    private void InitiateCreamItemReturn()
-    {
-        ClickableItem currentItem = handController.GetAttachedItem();
-        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
-        handController.MoveTo(itemReturnPosition, DetachCreamItemAndRetreatHand);
-    }
-
-    // Вызывается после возвращения предмета на его место.
-    private void DetachCreamItemAndRetreatHand()
+    private void DetachBrushAndRetreatHand()
     {
         handController.DetachAll();
         handController.ReturnToStartPosition(onSequenceComplete);
     }
 
-    #endregion
+    public void AnimateCreamApplication(Action onComplete)
+    {
+        onSequenceComplete = onComplete;
+        ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null || applyAnimationPositionMarker == null) { onSequenceComplete?.Invoke(); return; }
+        handController.MoveTo(applyAnimationPositionMarker.position, PerformCreamApplicationAnimation);
+    }
 
-    #region Общие Анимации и Корутины
+    private void PerformCreamApplicationAnimation()
+    {
+        StartCoroutine(CreamCircularMovementCoroutine(InitiateCreamItemReturn));
+    }
 
-    /// <summary>
-    /// Анимирует возврат предмета на его исходное место.
-    /// </summary>
+    private void InitiateCreamItemReturn()
+    {
+        ClickableItem currentItem = handController.GetAttachedItem();
+        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
+        handController.MoveTo(itemReturnPosition, DetachCreamItemAndRetreatHandForCream);
+    }
+
+    private void DetachCreamItemAndRetreatHandForCream()
+    {
+        handController.DetachAll();
+        handController.ReturnToStartPosition(onSequenceComplete);
+    }
+
     public void AnimateItemReturn(Action onComplete)
     {
         ClickableItem currentItem = handController.GetAttachedItem();
-        if (currentItem == null)
-        {
-            onComplete?.Invoke();
-            return;
-        }
-
+        if (currentItem == null) { onComplete?.Invoke(); return; }
         Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
         handController.MoveTo(itemReturnPosition, () => {
             handController.DetachAll();
@@ -148,13 +139,11 @@ public class HandAnimator : MonoBehaviour
         });
     }
 
-    // Корутина для плавного поворота руки.
     private IEnumerator RotateCoroutine(float targetAngle, float duration, Action onComplete)
     {
         Quaternion startRotation = transform.rotation;
         Quaternion targetRotation = Quaternion.Euler(0, 0, targetAngle);
         float elapsedTime = 0f;
-
         while (elapsedTime < duration)
         {
             transform.rotation = Quaternion.Lerp(startRotation, targetRotation, elapsedTime / duration);
@@ -165,52 +154,28 @@ public class HandAnimator : MonoBehaviour
         onComplete?.Invoke();
     }
 
-    // Корутина для "возюканья" кисточкой влево-вправо.
     private IEnumerator DabCoroutine(Action onComplete)
     {
-        // Получаем текущий инструмент из HandController
         BrushTool currentTool = handController.GetAttachedTool();
-        if (currentTool == null || currentTool.tipTransform == null)
-        {
-            Debug.LogError("Анимация 'возюканья' невозможна: не найден инструмент или его кончик (tipTransform)!");
-            onComplete?.Invoke();
-            yield break; // Прерываем корутину, если что-то не так
-        }
-
-        // --- КЛЮЧЕВАЯ ЛОГИКА ---
-        // 1. Вычисляем вектор смещения от центра руки до кончика кисточки.
-        // Этот вектор остается постоянным, пока кисточка в руке.
+        if (currentTool == null || currentTool.tipTransform == null) { onComplete?.Invoke(); yield break; }
         Vector3 handToTipOffset = currentTool.tipTransform.position - transform.position;
-
-        // 2. Определяем центральную точку для РУКИ.
-        // Она должна быть такой, чтобы КОНЧИК КИСТОЧКИ оказался точно над целью (animationTargetPosition).
         Vector3 handCenterPoint = animationTargetPosition - handToTipOffset;
-
         float elapsedTime = 0f;
         while (elapsedTime < blushDabDuration)
         {
             elapsedTime += Time.deltaTime;
-            // Используем синус для плавного движения туда-сюда
             float xOffset = Mathf.Sin(Time.time * blushDabSpeed) * blushDabDistance;
-
-            // 3. Двигаем РУКУ вокруг ее вычисленной центральной точки.
-            // В результате кончик кисточки будет двигаться вокруг цели.
             transform.position = handCenterPoint + new Vector3(xOffset, 0, 0);
-
             yield return null;
         }
-
-        // 4. По завершении ставим руку в финальную центральную позицию.
         transform.position = handCenterPoint;
         onComplete?.Invoke();
     }
 
-    // Корутина для кругового движения при нанесении крема.
     private IEnumerator CreamCircularMovementCoroutine(Action onComplete)
     {
         Vector3 centerPoint = transform.position;
         float elapsedTime = 0f;
-
         while (elapsedTime < creamApplyDuration)
         {
             elapsedTime += Time.deltaTime;
@@ -223,6 +188,4 @@ public class HandAnimator : MonoBehaviour
         transform.position = centerPoint;
         onComplete?.Invoke();
     }
-
-    #endregion
 }
