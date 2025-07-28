@@ -130,7 +130,7 @@ public class GameManager : MonoBehaviour
         HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator != null)
         {
-            handAnimator.AnimateApplyAndReturn(OnApplySequenceFinished);
+            handAnimator.AnimateCreamApplication(OnApplySequenceFinished);
         }
         else
         {
@@ -163,7 +163,7 @@ public class GameManager : MonoBehaviour
         HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator != null)
         {
-            handAnimator.AnimateReturnOnly(() => {
+            handAnimator.AnimateItemReturn(() => {
                 isBusy = false;
                 ChangeState(GameState.Idle, currentPhase);
             });
@@ -181,7 +181,7 @@ public class GameManager : MonoBehaviour
         Debug.Log("Начинаем последовательность для румян. Выбран цвет: " + selectedColor.itemColor);
         isBusy = true;
         hand.isDraggable = false;
-        ChangeState(GameState.AnimatingToItem, currentPhase); // Меняем состояние на "анимация"
+        ChangeState(GameState.AnimatingToItem, currentPhase);
 
         // --- НАЧАЛО ПОСЛЕДОВАТЕЛЬНОСТИ ДЕЙСТВИЙ ---
 
@@ -192,17 +192,32 @@ public class GameManager : MonoBehaviour
             hand.AttachTool(blushBrush);
             Debug.Log("Кисточка взята.");
 
-            // --- ЗДЕСЬ ПОКА ОСТАНОВИМСЯ ---
-            // В будущем здесь будет продолжение: движение к палетке, потом к лицу.
-            // Пока что мы просто завершаем последовательность для проверки.
-            isBusy = false;
-            // Можно, например, сразу перевести руку в состояние PlayerControl для теста
-            // hand.isDraggable = true;
-            // ChangeState(GameState.PlayerControl, currentPhase);
+            // Шаг 3: Запускаем анимацию взятия цвета из палетки
+            HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
+            if (handAnimator != null)
+            {
+                // Вызываем переименованный метод AnimateBlushPickup
+                handAnimator.AnimateBlushPickup(selectedColor.transform.position, () => {
 
-            // Или просто вернуть в состояние Idle
-            ChangeState(GameState.Idle, currentPhase);
-            Debug.Log("Первая часть последовательности завершена.");
+                    // Шаг 4: Анимация завершена. Окрашиваем кончик кисточки.
+                    blushBrush.SetTipColor(selectedColor.itemColor);
+                    Debug.Log("Кисточка окрашена в цвет: " + selectedColor.itemColor);
+
+                    // Шаг 5: Передаем управление игроку
+                    // (В будущем здесь может быть движение руки в позицию готовности)
+                    isBusy = false;
+                    hand.isDraggable = true;
+                    ChangeState(GameState.PlayerControl, currentPhase);
+                    Debug.Log("Последовательность завершена. Можно перетаскивать кисточку.");
+                });
+            }
+            else
+            {
+                Debug.LogError("HandAnimator не найден на объекте руки!");
+                // Аварийное завершение, если аниматор не найден
+                isBusy = false;
+                ChangeState(GameState.Idle, currentPhase);
+            }
         });
     }
 }

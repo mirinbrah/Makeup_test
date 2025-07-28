@@ -1,11 +1,16 @@
+// В файле BrushTool.cs
+
 using UnityEngine;
+
 public class BrushTool : MonoBehaviour
 {
-    [Tooltip("Точка, за которую 'держится' рука")]
+    [Header("Настройки Инструмента")]
     public Transform gripPoint;
+    public SpriteRenderer tipSpriteRenderer; // Оставляем для окрашивания
 
-    [Tooltip("SpriteRenderer кончика кисточки для окрашивания")]
-    public SpriteRenderer tipSpriteRenderer;
+    // +++ НОВОЕ ПОЛЕ +++
+    [Tooltip("Transform кончика кисточки для точного позиционирования анимации")]
+    public Transform tipTransform; // Сюда мы перетащим 'blush brush cone'
 
     private Vector3 originalPosition;
     private Quaternion originalRotation;
@@ -18,8 +23,12 @@ public class BrushTool : MonoBehaviour
 
     public Vector3 GetOriginalPosition() => originalPosition;
     public Quaternion GetOriginalRotation() => originalRotation;
+
     public void SetTipColor(Color newColor)
     {
-        tipSpriteRenderer.color = newColor;
+        if (tipSpriteRenderer != null)
+        {
+            tipSpriteRenderer.color = newColor;
+        }
     }
 }
