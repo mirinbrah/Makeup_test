@@ -64,9 +64,15 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         }
         if (attachedTool != null)
         {
-            attachedTool.transform.SetParent(null);
+            // --- ИЗМЕНЕННАЯ ЛОГИКА ЗДЕСЬ ---
+            // 1. Возвращаем кисточку в ее исходный родительский контейнер
+            attachedTool.transform.SetParent(attachedTool.GetOriginalParent());
+
+            // 2. Восстанавливаем ее позицию и поворот
             attachedTool.transform.position = attachedTool.GetOriginalPosition();
             attachedTool.transform.rotation = attachedTool.GetOriginalRotation();
+
+            // 3. Отпускаем ссылку
             attachedTool = null;
         }
     }
@@ -76,16 +82,10 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         return attachedItem;
     }
 
-    // +++ ВОТ НЕДОСТАЮЩИЙ МЕТОД +++
-    /// <summary>
-    /// Возвращает прикрепленный к руке инструмент (кисточку).
-    /// </summary>
-    /// <returns>Компонент BrushTool или null, если ничего не прикреплено.</returns>
     public BrushTool GetAttachedTool()
     {
         return attachedTool;
     }
-    // +++++++++++++++++++++++++++++++
 
     public void MoveTo(Vector3 target, Action onCompleteCallback)
     {
