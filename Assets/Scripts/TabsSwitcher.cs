@@ -10,7 +10,9 @@ public class TabsSwitcher : MonoBehaviour
 
     public GameObject unactiveTab;
 
-    private SpriteRenderer _spriteRenderer;
+    [Header("Наполнение Фазы")]
+    [Tooltip("Контейнер с инструментами и объектами для этой фазы")]
+    public GameObject contentContainer;
 
     void Start()
     {
@@ -21,6 +23,8 @@ public class TabsSwitcher : MonoBehaviour
     {
         activeTab.SetActive(isActive);
         unactiveTab.SetActive(!isActive);
+
+        contentContainer.SetActive(isActive);
     }
 
     private void OnMouseDown()
