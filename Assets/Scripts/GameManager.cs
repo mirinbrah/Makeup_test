@@ -8,13 +8,9 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
     public static event Action<GamePhase, GameState> OnPhaseStateChanged;
 
-    [Header("Состояние игры")]
-    [SerializeField] private GamePhase currentPhase;
-    private GameState currentState;
-
     [Header("Основные ссылки")]
     public HandController hand;
-    public GameObject acneSprite;
+    public MakeupDatabase makeupDatabase;
     public EventSystem eventSystem;
 
     [Header("Управление вкладками")]
@@ -25,12 +21,15 @@ public class GameManager : MonoBehaviour
     [Header("Сброс макияжа")]
     public List<Transform> makeupContainers;
 
-    [Header("Базы данных и Зоны")]
-    public MakeupDatabase makeupDatabase;
+    [Header("Объекты для фазы Крема")]
+    public GameObject acneSprite;
 
     [Header("Объекты для фазы Румян")]
     public BrushTool blushBrush;
     public Transform blushApplyPositionMarker;
+
+    private GamePhase currentPhase;
+    private GameState currentState;
 
     private bool isBusy = false;
     private bool targetReached = false;
@@ -39,25 +38,10 @@ public class GameManager : MonoBehaviour
     void Awake()
     {
         Instance = this;
-        if (makeupDatabase != null)
-        {
-            foreach (var mapping in makeupDatabase.blushMappings)
-            {
-                if (mapping.faceObject != null)
-                {
-                    mapping.faceObject.SetActive(false);
-                }
-            }
-        }
     }
 
     void Start()
     {
-        if (eventSystem == null)
-        {
-            // --- ИСПРАВЛЕНИЕ 1: Используем новый метод ---
-            eventSystem = FindFirstObjectByType<EventSystem>();
-        }
         SwitchToPhase(GamePhase.Acne, true);
     }
 
@@ -222,10 +206,8 @@ public class GameManager : MonoBehaviour
             handAnimator.AnimateBlushPickup(selectedColor.transform.position, () => {
                 blushBrush.SetTipColor(selectedColor.itemColor);
 
-                // --- ИСПРАВЛЕНИЕ 2: Передаем два колбэка ---
                 handAnimator.AnimateBlushApplication(
                     blushApplyPositionMarker.position,
-                    // 1. Колбэк после нанесения
                     () => {
                         if (makeupDatabase != null)
                         {
@@ -236,7 +218,6 @@ public class GameManager : MonoBehaviour
                             }
                         }
                     },
-                    // 2. Колбэк после завершения всей последовательности
                     () => {
                         activeColorSource = null;
                         SetBusyState(false);
