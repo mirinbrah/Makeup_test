@@ -190,13 +190,15 @@ public class GameManager : MonoBehaviour
         }
         else if (Vector3.Distance(activeItem.transform.position, activeItem.GetOriginalPosition()) < returnDistanceThreshold)
         {
-            ChangeState(GameState.Idle, currentPhase);
-            activeItem = null;
-
-            hand.DetachAll();
-            hand.ReturnToStartPosition(() => {
-                SetBusyState(false);
-            });
+            handAnimator.AnimateItemReturn(
+                () => {
+                    activeItem = null;
+                    ChangeState(GameState.Idle, currentPhase);
+                },
+                () => {
+                    SetBusyState(false);
+                }
+            );
         }
         else
         {
