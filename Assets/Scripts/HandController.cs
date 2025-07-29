@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using System;
 using System.Collections.Generic;
+using UnityEngine.InputSystem;
 
 public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -10,8 +11,13 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     public float moveSpeed = 5f;
     public Transform startPositionMarker;
 
+    [Header("Визуал Руки для Сортировки")]
+    public SpriteRenderer handTopRenderer;
+    public SpriteRenderer handBottomRenderer;
+
     [Header("Настройки Сортировки")]
-    public int activeSortingOrder = 100;
+    public int idleSortingOrder = 100;   
+    public int activeSortingOrder = 200;  
 
     private ClickableItem attachedItem;
     private BrushTool attachedTool;
@@ -22,14 +28,12 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     private Vector3 dragOffset;
     private Camera mainCamera;
 
-    private Dictionary<Renderer, int> originalOrders;
+    private Dictionary<Renderer, int> attachedObjectOriginalOrders = new Dictionary<Renderer, int>();
 
     void Awake()
     {
         mainCamera = Camera.main;
         if (gripPoint == null) gripPoint = this.transform;
-
-        originalOrders = new Dictionary<Renderer, int>();
     }
 
     void Start()
@@ -38,6 +42,19 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         {
             transform.position = startPositionMarker.position;
         }
+        SetIdleSorting();
+    }
+
+    private void SetIdleSorting()
+    {
+        if (handBottomRenderer != null) handBottomRenderer.sortingOrder = idleSortingOrder;
+        if (handTopRenderer != null) handTopRenderer.sortingOrder = idleSortingOrder + 1;
+    }
+
+    private void SetActiveSorting()
+    {
+        if (handBottomRenderer != null) handBottomRenderer.sortingOrder = activeSortingOrder;
+        if (handTopRenderer != null) handTopRenderer.sortingOrder = activeSortingOrder + 2;
     }
 
     public void AttachItem(ClickableItem item)
@@ -45,8 +62,14 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         DetachAll();
         attachedItem = item;
 
-        SaveOriginalOrders(item.transform);
-        SetOrderActive(item.transform, true);
+        SetActiveSorting();
+
+        attachedObjectOriginalOrders.Clear();
+        foreach (var rend in item.GetComponentsInChildren<Renderer>(true))
+        {
+            attachedObjectOriginalOrders[rend] = rend.sortingOrder;
+            rend.sortingOrder = activeSortingOrder + 1; 
+        }
 
         item.transform.SetParent(transform);
         item.transform.rotation = transform.rotation;
@@ -59,8 +82,14 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
         DetachAll();
         attachedTool = tool;
 
-        SaveOriginalOrders(tool.transform);
-        SetOrderActive(tool.transform, true);
+        SetActiveSorting();
+
+        attachedObjectOriginalOrders.Clear();
+        foreach (var rend in tool.GetComponentsInChildren<Renderer>(true))
+        {
+            attachedObjectOriginalOrders[rend] = rend.sortingOrder;
+            rend.sortingOrder = activeSortingOrder + 1; 
+        }
 
         tool.transform.SetParent(transform);
         tool.transform.rotation = transform.rotation;
@@ -70,72 +99,30 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
 
     public void DetachAll()
     {
-        RestoreOriginalOrders();
+        SetIdleSorting();
 
         if (attachedItem != null)
         {
+            foreach (var pair in attachedObjectOriginalOrders)
+            {
+                if (pair.Key != null) pair.Key.sortingOrder = pair.Value;
+            }
             attachedItem.transform.SetParent(attachedItem.GetOriginalParent());
             attachedItem.transform.position = attachedItem.GetOriginalPosition();
             attachedItem = null;
         }
         if (attachedTool != null)
         {
+            foreach (var pair in attachedObjectOriginalOrders)
+            {
+                if (pair.Key != null) pair.Key.sortingOrder = pair.Value;
+            }
             attachedTool.transform.SetParent(attachedTool.GetOriginalParent());
             attachedTool.transform.position = attachedTool.GetOriginalPosition();
             attachedTool.transform.rotation = attachedTool.GetOriginalRotation();
             attachedTool = null;
         }
-    }
-
-    public void SetOrderActive(bool isActive)
-    {
-        if (isActive)
-        {
-            SaveOriginalOrders(transform);
-            SetOrderActive(transform, true);
-        }
-        else
-        {
-            RestoreOriginalOrders();
-        }
-    }
-
-    private void SaveOriginalOrders(Transform parent)
-    {
-        if (parent == null) return;
-        originalOrders.Clear();
-
-        Renderer[] renderers = parent.GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer renderer in renderers)
-        {
-            originalOrders[renderer] = renderer.sortingOrder;
-        }
-    }
-
-    private void RestoreOriginalOrders()
-    {
-        if (originalOrders == null) return;
-        foreach (var pair in originalOrders)
-        {
-            if (pair.Key != null)
-            {
-                pair.Key.sortingOrder = pair.Value;
-            }
-        }
-        originalOrders.Clear();
-    }
-
-    private void SetOrderActive(Transform parent, bool isActive)
-    {
-        if (parent == null) return;
-        Renderer[] renderers = parent.GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer renderer in renderers)
-        {
-            if (isActive)
-            {
-                renderer.sortingOrder = activeSortingOrder + (originalOrders.ContainsKey(renderer) ? originalOrders[renderer] : 0);
-            }
-        }
+        attachedObjectOriginalOrders.Clear();
     }
 
     public ClickableItem GetAttachedItem()
@@ -202,8 +189,13 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
 
     private Vector3 GetMouseWorldPos()
     {
-        Vector3 mousePos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
-        mousePos.z = 0;
-        return mousePos;
+        if (Pointer.current == null)
+        {
+            return transform.position;
+        }
+        Vector2 screenPos = Pointer.current.position.ReadValue();
+        Vector3 worldPos = mainCamera.ScreenToWorldPoint(screenPos);
+        worldPos.z = 0f;
+        return worldPos;
     }
 }

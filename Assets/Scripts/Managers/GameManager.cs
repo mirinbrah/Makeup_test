@@ -21,6 +21,9 @@ public class GameManager : MonoBehaviour
     [Header("Сброс макияжа")]
     public List<Transform> makeupContainers;
 
+    [Header("Настройки Возврата")]
+    public float returnDistanceThreshold = 1.5f;
+
     [Header("Объекты для фазы Крема")]
     public GameObject acneSprite;
     public Transform creamApplyPositionMarker;
@@ -128,13 +131,11 @@ public class GameManager : MonoBehaviour
         if (activeItem != null && activeItem != item)
         {
             SetBusyState(true);
-            hand.SetOrderActive(true);
             handAnimator.AnimateItemReturn(
                 () => {
                     activeItem = null;
                 },
                 () => {
-                    hand.SetOrderActive(false);
                     TakeItem(item);
                 }
             );
@@ -152,7 +153,6 @@ public class GameManager : MonoBehaviour
         if (item.itemPhase != currentPhase) return;
 
         SetBusyState(true);
-        hand.SetOrderActive(true);
         hand.isDraggable = false;
         activeItem = item;
         ChangeState(GameState.AnimatingToItem, currentPhase);
@@ -172,10 +172,13 @@ public class GameManager : MonoBehaviour
 
     public void OnDragEnded()
     {
-        if (isBusy) return;
+        if (isBusy || activeItem == null) return;
+
+        hand.isDraggable = false;
+        SetBusyState(true);
+
         if (targetReached)
         {
-            hand.isDraggable = false;
             if (currentPhase == GamePhase.Acne)
             {
                 ApplyAction();
@@ -185,25 +188,24 @@ public class GameManager : MonoBehaviour
                 ApplyLipstick();
             }
         }
+        else if (Vector3.Distance(activeItem.transform.position, activeItem.GetOriginalPosition()) < returnDistanceThreshold)
+        {
+            ChangeState(GameState.Idle, currentPhase);
+            activeItem = null;
+
+            hand.DetachAll();
+            hand.ReturnToStartPosition(() => {
+                SetBusyState(false);
+            });
+        }
         else
         {
-            if (hand.GetAttachedItem() != null)
-            {
-                SetBusyState(true);
-                hand.SetOrderActive(true); 
-                handAnimator.AnimateItemReturn(
-                    () => {
-                        activeItem = null;
-                        hand.isDraggable = false;
-                        ChangeState(GameState.Idle, currentPhase);
-                    },
-                    () => {
-                        hand.SetOrderActive(false);
-                        SetBusyState(false);
-                    }
-                );
-            }
+            hand.MoveTo(activeItem.dragStartPosition.position, () => {
+                hand.isDraggable = true;
+                SetBusyState(false);
+            });
         }
+
         targetReached = false;
     }
 
@@ -226,7 +228,6 @@ public class GameManager : MonoBehaviour
                 },
                 () => {
                     activeItem = null;
-                    hand.SetOrderActive(false);
                     SetBusyState(false);
                     SwitchToPhase(GamePhase.Blush);
                 }
@@ -255,7 +256,6 @@ public class GameManager : MonoBehaviour
             },
             () => {
                 activeItem = null;
-                hand.SetOrderActive(false);
                 SetBusyState(false);
                 ChangeState(GameState.Idle, currentPhase);
             }
@@ -265,7 +265,6 @@ public class GameManager : MonoBehaviour
     private void ResetAction()
     {
         SetBusyState(true);
-        hand.SetOrderActive(true);
         hand.isDraggable = false;
         ChangeState(GameState.ReturningSequence, currentPhase);
         if (handAnimator != null)
@@ -276,7 +275,6 @@ public class GameManager : MonoBehaviour
                     ChangeState(GameState.Idle, currentPhase);
                 },
                 () => {
-                    hand.SetOrderActive(false);
                     SetBusyState(false);
                 }
             );
@@ -304,7 +302,6 @@ public class GameManager : MonoBehaviour
         }
 
         SetBusyState(true);
-        hand.SetOrderActive(true);
         activeColorSource = selectedColor;
         ChangeState(GameState.Applying, currentPhase);
 
@@ -330,7 +327,6 @@ public class GameManager : MonoBehaviour
                     },
                     () => {
                         activeColorSource = null;
-                        hand.SetOrderActive(false);
                         SetBusyState(false);
                         ChangeState(GameState.Idle, currentPhase);
                     }

@@ -1,6 +1,7 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
-public class TabsSwitcher : MonoBehaviour
+public class TabsSwitcher : MonoBehaviour, IPointerClickHandler
 {
     public GamePhase phase;
     public GameObject activeTab;
@@ -19,8 +20,8 @@ public class TabsSwitcher : MonoBehaviour
         if (contentContainer != null) contentContainer.SetActive(isActive);
     }
 
-    private void OnMouseDown()
+    public void OnPointerClick(PointerEventData eventData)
     {
-        GameManager.Instance.SwitchToPhase(phase);
+      GameManager.Instance.SwitchToPhase(phase); 
     }
 }
