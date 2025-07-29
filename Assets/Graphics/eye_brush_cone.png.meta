@@ -212,7 +212,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      eye_brush_cone_0: 9082349553792134993
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

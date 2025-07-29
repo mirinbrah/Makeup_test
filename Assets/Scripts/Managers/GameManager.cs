@@ -41,7 +41,7 @@ public class GameManager : MonoBehaviour
     private bool targetReached = false;
     private ColorSource activeColorSource;
     private ClickableItem activeItem;
-    private HandAnimator handAnimator; 
+    private HandAnimator handAnimator;
 
     void Awake()
     {
@@ -54,6 +54,10 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        if (eventSystem == null)
+        {
+            eventSystem = FindFirstObjectByType<EventSystem>();
+        }
         SwitchToPhase(GamePhase.Acne, true);
     }
 
@@ -124,11 +128,13 @@ public class GameManager : MonoBehaviour
         if (activeItem != null && activeItem != item)
         {
             SetBusyState(true);
+            hand.SetOrderActive(true);
             handAnimator.AnimateItemReturn(
-                () => { 
+                () => {
                     activeItem = null;
                 },
-                () => { 
+                () => {
+                    hand.SetOrderActive(false);
                     TakeItem(item);
                 }
             );
@@ -146,6 +152,7 @@ public class GameManager : MonoBehaviour
         if (item.itemPhase != currentPhase) return;
 
         SetBusyState(true);
+        hand.SetOrderActive(true);
         hand.isDraggable = false;
         activeItem = item;
         ChangeState(GameState.AnimatingToItem, currentPhase);
@@ -183,13 +190,15 @@ public class GameManager : MonoBehaviour
             if (hand.GetAttachedItem() != null)
             {
                 SetBusyState(true);
+                hand.SetOrderActive(true); 
                 handAnimator.AnimateItemReturn(
-                    () => { 
+                    () => {
                         activeItem = null;
                         hand.isDraggable = false;
-                        ChangeState(GameState.Idle, currentPhase); 
+                        ChangeState(GameState.Idle, currentPhase);
                     },
-                    () => { 
+                    () => {
+                        hand.SetOrderActive(false);
                         SetBusyState(false);
                     }
                 );
@@ -217,6 +226,7 @@ public class GameManager : MonoBehaviour
                 },
                 () => {
                     activeItem = null;
+                    hand.SetOrderActive(false);
                     SetBusyState(false);
                     SwitchToPhase(GamePhase.Blush);
                 }
@@ -245,6 +255,7 @@ public class GameManager : MonoBehaviour
             },
             () => {
                 activeItem = null;
+                hand.SetOrderActive(false);
                 SetBusyState(false);
                 ChangeState(GameState.Idle, currentPhase);
             }
@@ -254,16 +265,18 @@ public class GameManager : MonoBehaviour
     private void ResetAction()
     {
         SetBusyState(true);
+        hand.SetOrderActive(true);
         hand.isDraggable = false;
         ChangeState(GameState.ReturningSequence, currentPhase);
         if (handAnimator != null)
         {
             handAnimator.AnimateItemReturn(
-                () => { 
+                () => {
                     activeItem = null;
-                    ChangeState(GameState.Idle, currentPhase); 
+                    ChangeState(GameState.Idle, currentPhase);
                 },
                 () => {
+                    hand.SetOrderActive(false);
                     SetBusyState(false);
                 }
             );
@@ -291,6 +304,7 @@ public class GameManager : MonoBehaviour
         }
 
         SetBusyState(true);
+        hand.SetOrderActive(true);
         activeColorSource = selectedColor;
         ChangeState(GameState.Applying, currentPhase);
 
@@ -316,11 +330,22 @@ public class GameManager : MonoBehaviour
                     },
                     () => {
                         activeColorSource = null;
+                        hand.SetOrderActive(false);
                         SetBusyState(false);
                         ChangeState(GameState.Idle, currentPhase);
                     }
                 );
             });
         });
+    }
+
+    public void PauseGame()
+    {
+        Time.timeScale = 0f;
+    }
+
+    public void ResumeGame()
+    {
+        Time.timeScale = 1f;
     }
 }

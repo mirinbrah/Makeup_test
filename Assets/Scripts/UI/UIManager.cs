@@ -2,18 +2,34 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-
 public class UIManager : MonoBehaviour
 {
     [Header("Элементы UI")]
     public Button resetButton;
     public TextMeshProUGUI questText;
 
+    [Header("Меню Паузы")]
+    public Button menuButton;
+    public GameObject pauseMenuPanel;
+
     void Awake()
     {
         if (resetButton != null)
         {
             resetButton.onClick.AddListener(OnResetButtonClicked);
+        }
+
+        if (menuButton != null)
+        {
+            menuButton.onClick.AddListener(OnMenuButtonClicked);
+        }
+    }
+
+    void Start()
+    {
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(false);
         }
     }
 
@@ -26,7 +42,6 @@ public class UIManager : MonoBehaviour
     {
         GameManager.OnPhaseStateChanged -= HandlePhaseStateChanged;
     }
-
 
     private void HandlePhaseStateChanged(GamePhase phase, GameState state)
     {
@@ -57,5 +72,13 @@ public class UIManager : MonoBehaviour
     private void OnResetButtonClicked()
     {
         GameManager.Instance.PerformReset();
+    }
+
+    private void OnMenuButtonClicked()
+    {
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(true);
+        }
     }
 }

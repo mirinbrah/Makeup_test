@@ -212,7 +212,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      blush_brush_cone_0: -1117941517600386021
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

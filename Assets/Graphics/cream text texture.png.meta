@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: c8b125a3f591bbc42b040bcc82d113b4
+guid: be1485736dd2e514e952fa44bdb3ff64
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2454760054173239688
-    second: hand_compressed_top_0
+      213: 2598949050187628857
+    second: cream text texture_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -178,13 +178,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: hand_compressed_top_0
+      name: cream text texture_0
       rect:
         serializedVersion: 2
-        x: 72
-        y: 198
-        width: 68
-        height: 69
+        x: 0
+        y: 0
+        width: 86
+        height: 100
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -193,8 +193,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 88980dd634f011220800000000000000
-      internalID: 2454760054173239688
+      spriteID: 931c5cd2462511420800000000000000
+      internalID: 2598949050187628857
       vertices: []
       indices: 
       edges: []
@@ -213,7 +213,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      hand_compressed_top_0: 2454760054173239688
+      cream text texture_0: 2598949050187628857
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

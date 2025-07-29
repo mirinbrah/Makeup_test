@@ -212,7 +212,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      DollBody_compressed_0: 8423520626789853753
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

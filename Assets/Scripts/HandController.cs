@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using System;
+using System.Collections.Generic;
 
 public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -8,6 +9,9 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     public Transform gripPoint;
     public float moveSpeed = 5f;
     public Transform startPositionMarker;
+
+    [Header("Настройки Сортировки")]
+    public int activeSortingOrder = 100;
 
     private ClickableItem attachedItem;
     private BrushTool attachedTool;
@@ -18,14 +22,14 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     private Vector3 dragOffset;
     private Camera mainCamera;
 
+    private Dictionary<Renderer, int> originalOrders;
+
     void Awake()
     {
         mainCamera = Camera.main;
         if (gripPoint == null) gripPoint = this.transform;
-        if (startPositionMarker == null)
-        {
-            Debug.LogError("У HandController не назначен маркер стартовой позиции!", this);
-        }
+
+        originalOrders = new Dictionary<Renderer, int>();
     }
 
     void Start()
@@ -40,6 +44,10 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     {
         DetachAll();
         attachedItem = item;
+
+        SaveOriginalOrders(item.transform);
+        SetOrderActive(item.transform, true);
+
         item.transform.SetParent(transform);
         item.transform.rotation = transform.rotation;
         Vector3 itemOffset = item.transform.position - item.gripPoint.position;
@@ -50,6 +58,10 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     {
         DetachAll();
         attachedTool = tool;
+
+        SaveOriginalOrders(tool.transform);
+        SetOrderActive(tool.transform, true);
+
         tool.transform.SetParent(transform);
         tool.transform.rotation = transform.rotation;
         Vector3 toolOffset = tool.transform.position - tool.gripPoint.position;
@@ -58,6 +70,8 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
 
     public void DetachAll()
     {
+        RestoreOriginalOrders();
+
         if (attachedItem != null)
         {
             attachedItem.transform.SetParent(attachedItem.GetOriginalParent());
@@ -70,6 +84,57 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
             attachedTool.transform.position = attachedTool.GetOriginalPosition();
             attachedTool.transform.rotation = attachedTool.GetOriginalRotation();
             attachedTool = null;
+        }
+    }
+
+    public void SetOrderActive(bool isActive)
+    {
+        if (isActive)
+        {
+            SaveOriginalOrders(transform);
+            SetOrderActive(transform, true);
+        }
+        else
+        {
+            RestoreOriginalOrders();
+        }
+    }
+
+    private void SaveOriginalOrders(Transform parent)
+    {
+        if (parent == null) return;
+        originalOrders.Clear();
+
+        Renderer[] renderers = parent.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in renderers)
+        {
+            originalOrders[renderer] = renderer.sortingOrder;
+        }
+    }
+
+    private void RestoreOriginalOrders()
+    {
+        if (originalOrders == null) return;
+        foreach (var pair in originalOrders)
+        {
+            if (pair.Key != null)
+            {
+                pair.Key.sortingOrder = pair.Value;
+            }
+        }
+        originalOrders.Clear();
+    }
+
+    private void SetOrderActive(Transform parent, bool isActive)
+    {
+        if (parent == null) return;
+        Renderer[] renderers = parent.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in renderers)
+        {
+            if (isActive)
+            {
+                renderer.sortingOrder = activeSortingOrder + (originalOrders.ContainsKey(renderer) ? originalOrders[renderer] : 0);
+            }
         }
     }
 

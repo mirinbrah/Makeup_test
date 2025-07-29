@@ -1,5 +1,4 @@
 using UnityEngine;
-
 public class BrushTool : MonoBehaviour
 {
     [Header("Настройки Инструмента")]
@@ -9,18 +8,18 @@ public class BrushTool : MonoBehaviour
 
     private Vector3 originalPosition;
     private Quaternion originalRotation;
-    private Transform originalParent; // <-- НОВОЕ ПОЛЕ
+    private Transform originalParent; 
 
     void Awake()
     {
         originalPosition = transform.position;
         originalRotation = transform.rotation;
-        originalParent = transform.parent; // <-- ЗАПОМИНАЕМ РОДИТЕЛЯ
+        originalParent = transform.parent; 
     }
 
     public Vector3 GetOriginalPosition() => originalPosition;
     public Quaternion GetOriginalRotation() => originalRotation;
-    public Transform GetOriginalParent() => originalParent; // <-- НОВЫЙ МЕТОД
+    public Transform GetOriginalParent() => originalParent; 
 
     public void SetTipColor(Color newColor)
     {
