@@ -1,6 +1,6 @@
+using UnityEngine;
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class GameManager : MonoBehaviour
@@ -23,14 +23,16 @@ public class GameManager : MonoBehaviour
 
     [Header("Объекты для фазы Крема")]
     public GameObject acneSprite;
+    public Transform creamApplyPositionMarker;
 
     [Header("Объекты для фазы Румян")]
     public BrushTool blushBrush;
-    public Transform blushApplyPositionMarker;
 
     [Header("Объекты для фазы Теней")]
     public BrushTool eyeshadowBrush;
-    public Transform eyeshadowApplyPositionMarker;
+
+    [Header("Объекты для фазы Помады")]
+    public List<ClickableItem> lipsticks;
 
     private GamePhase currentPhase;
     private GameState currentState;
@@ -38,18 +40,20 @@ public class GameManager : MonoBehaviour
     private bool isBusy = false;
     private bool targetReached = false;
     private ColorSource activeColorSource;
+    private ClickableItem activeItem;
+    private HandAnimator handAnimator; 
 
     void Awake()
     {
         Instance = this;
+        if (hand != null)
+        {
+            handAnimator = hand.GetComponent<HandAnimator>();
+        }
     }
 
     void Start()
     {
-        if (eventSystem == null)
-        {
-            eventSystem = FindFirstObjectByType<EventSystem>();
-        }
         SwitchToPhase(GamePhase.Acne, true);
     }
 
@@ -86,7 +90,11 @@ public class GameManager : MonoBehaviour
 
     public void SwitchToPhase(GamePhase newPhase, bool forceChange = false)
     {
-        if (!forceChange && (isBusy || currentPhase == newPhase)) return;
+        bool isHandHoldingSomething = (activeItem != null || hand.GetAttachedTool() != null);
+        if (!forceChange && (isBusy || currentPhase == newPhase || isHandHoldingSomething))
+        {
+            return;
+        }
 
         currentPhase = newPhase;
         ChangeState(GameState.Idle, newPhase);
@@ -111,11 +119,38 @@ public class GameManager : MonoBehaviour
 
     public void OnItemClicked(ClickableItem item)
     {
-        if (isBusy || item.itemPhase != currentPhase) return;
+        if (isBusy) return;
+
+        if (activeItem != null && activeItem != item)
+        {
+            SetBusyState(true);
+            handAnimator.AnimateItemReturn(
+                () => { 
+                    activeItem = null;
+                },
+                () => { 
+                    TakeItem(item);
+                }
+            );
+            return;
+        }
+
+        if (activeItem == null)
+        {
+            TakeItem(item);
+        }
+    }
+
+    private void TakeItem(ClickableItem item)
+    {
+        if (item.itemPhase != currentPhase) return;
+
         SetBusyState(true);
         hand.isDraggable = false;
+        activeItem = item;
         ChangeState(GameState.AnimatingToItem, currentPhase);
-        hand.MoveTo(item.transform.position, () => {
+
+        hand.MoveTo(item.gripPoint.position, () => {
             hand.AttachItem(item);
             hand.MoveTo(item.dragStartPosition.position, () => {
                 hand.isDraggable = true;
@@ -138,17 +173,26 @@ public class GameManager : MonoBehaviour
             {
                 ApplyAction();
             }
+            else if (currentPhase == GamePhase.Lipstick)
+            {
+                ApplyLipstick();
+            }
         }
         else
         {
             if (hand.GetAttachedItem() != null)
             {
                 SetBusyState(true);
-                hand.GetComponent<HandAnimator>().AnimateItemReturn(() => {
-                    hand.isDraggable = true;
-                    SetBusyState(false);
-                    ChangeState(GameState.PlayerControl, currentPhase);
-                });
+                handAnimator.AnimateItemReturn(
+                    () => { 
+                        activeItem = null;
+                        hand.isDraggable = false;
+                        ChangeState(GameState.Idle, currentPhase); 
+                    },
+                    () => { 
+                        SetBusyState(false);
+                    }
+                );
             }
         }
         targetReached = false;
@@ -164,26 +208,47 @@ public class GameManager : MonoBehaviour
     {
         SetBusyState(true);
         ChangeState(GameState.Applying, currentPhase);
-        HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator != null)
         {
-            handAnimator.AnimateCreamApplication(OnApplySequenceFinished);
+            handAnimator.AnimateItemApplication(
+                GamePhase.Acne,
+                () => {
+                    if (acneSprite != null) acneSprite.SetActive(false);
+                },
+                () => {
+                    activeItem = null;
+                    SetBusyState(false);
+                    SwitchToPhase(GamePhase.Blush);
+                }
+            );
         }
     }
 
-    private void OnApplySequenceFinished()
+    private void ApplyLipstick()
     {
-        if (currentPhase == GamePhase.Acne)
-        {
-            if (acneSprite != null) acneSprite.SetActive(false);
-            SetBusyState(false);
-            SwitchToPhase(GamePhase.Blush);
-        }
-        else
-        {
-            SetBusyState(false);
-            ChangeState(GameState.Idle, currentPhase);
-        }
+        if (activeItem == null) return;
+
+        SetBusyState(true);
+        ChangeState(GameState.Applying, currentPhase);
+
+        handAnimator.AnimateItemApplication(
+            GamePhase.Lipstick,
+            () => {
+                if (makeupDatabase != null)
+                {
+                    GameObject faceObject = makeupDatabase.GetFaceObjectFor(activeItem);
+                    if (faceObject != null)
+                    {
+                        faceObject.SetActive(true);
+                    }
+                }
+            },
+            () => {
+                activeItem = null;
+                SetBusyState(false);
+                ChangeState(GameState.Idle, currentPhase);
+            }
+        );
     }
 
     private void ResetAction()
@@ -191,13 +256,17 @@ public class GameManager : MonoBehaviour
         SetBusyState(true);
         hand.isDraggable = false;
         ChangeState(GameState.ReturningSequence, currentPhase);
-        HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
         if (handAnimator != null)
         {
-            handAnimator.AnimateItemReturn(() => {
-                SetBusyState(false);
-                ChangeState(GameState.Idle, currentPhase);
-            });
+            handAnimator.AnimateItemReturn(
+                () => { 
+                    activeItem = null;
+                    ChangeState(GameState.Idle, currentPhase); 
+                },
+                () => {
+                    SetBusyState(false);
+                }
+            );
         }
     }
 
@@ -206,22 +275,18 @@ public class GameManager : MonoBehaviour
         if (isBusy || currentPhase != selectedColor.itemPhase) return;
 
         BrushTool currentBrush = null;
-        Transform currentApplyMarker = null;
 
         if (currentPhase == GamePhase.Blush)
         {
             currentBrush = blushBrush;
-            currentApplyMarker = blushApplyPositionMarker;
         }
         else if (currentPhase == GamePhase.Eyeshadow)
         {
             currentBrush = eyeshadowBrush;
-            currentApplyMarker = eyeshadowApplyPositionMarker;
         }
 
-        if (currentBrush == null || currentApplyMarker == null)
+        if (currentBrush == null)
         {
-            Debug.LogError("Инструменты для фазы " + currentPhase + " не настроены в GameManager!");
             return;
         }
 
@@ -232,14 +297,13 @@ public class GameManager : MonoBehaviour
         hand.MoveTo(currentBrush.gripPoint.position, () =>
         {
             hand.AttachTool(currentBrush);
-            HandAnimator handAnimator = hand.GetComponent<HandAnimator>();
 
             handAnimator.AnimateMakeupPickup(selectedColor.transform.position, () => {
 
                 currentBrush.SetTipColor(selectedColor.itemColor);
 
                 handAnimator.AnimateMakeupApplication(
-                    currentApplyMarker.position,
+                    currentPhase,
                     () => {
                         if (makeupDatabase != null)
                         {

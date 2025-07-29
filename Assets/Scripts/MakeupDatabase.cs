@@ -10,8 +10,16 @@ public class MakeupDatabase : MonoBehaviour
         public GameObject faceObject;
     }
 
+    [System.Serializable]
+    public class LipstickMapping
+    {
+        public ClickableItem keyLipstick; 
+        public GameObject faceObject;
+    }
+
     public List<MakeupMapping> blushMappings;
     public List<MakeupMapping> eyeshadowMappings;
+    public List<LipstickMapping> lipstickMappings;
 
     public GameObject GetFaceObjectFor(ColorSource source, GamePhase phase)
     {
@@ -36,6 +44,16 @@ public class MakeupDatabase : MonoBehaviour
             }
         }
 
+        return null;
+    }
+
+    public GameObject GetFaceObjectFor(ClickableItem lipstick)
+    {
+        LipstickMapping foundMapping = lipstickMappings.Find(m => m.keyLipstick == lipstick);
+        if (foundMapping != null)
+        {
+            return foundMapping.faceObject;
+        }
         return null;
     }
 }

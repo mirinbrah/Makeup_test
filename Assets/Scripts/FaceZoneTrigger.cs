@@ -4,10 +4,11 @@ public class FaceZoneTrigger : MonoBehaviour
 {
     private const string TOOL_TAG = "Tool";
     private const string CREAM_TAG = "Cream";
+    private const string LIPSTICK_TAG = "Lipstick";
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag(TOOL_TAG) || other.CompareTag(CREAM_TAG))
+        if (other.CompareTag(TOOL_TAG) || other.CompareTag(CREAM_TAG) || other.CompareTag(LIPSTICK_TAG))
         {
             GameManager.Instance.OnItemReachedTargetZone();
         }
@@ -15,7 +16,7 @@ public class FaceZoneTrigger : MonoBehaviour
 
     private void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag(TOOL_TAG) || other.CompareTag(CREAM_TAG))
+        if (other.CompareTag(TOOL_TAG) || other.CompareTag(CREAM_TAG) || other.CompareTag(LIPSTICK_TAG))
         {
             GameManager.Instance.OnItemLeftTargetZone();
         }

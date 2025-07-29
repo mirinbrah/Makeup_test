@@ -4,14 +4,22 @@ using System.Collections;
 
 public class HandAnimator : MonoBehaviour
 {
-    [Header("Общие Настройки")]
-    public Transform applyAnimationPositionMarker;
+    [Header("Маркеры Позиций Анимаций")]
+    public Transform creamApplyPositionMarker;
+    public Transform lipstickApplyPositionMarker;
+    public Transform blushApplyPositionMarker;
+    public Transform eyeshadowApplyPositionMarker;
 
-    [Header("Настройки Анимации 'Крем'")]
+    [Header("Настройки Анимации 'Крем' (Круговая)")]
     public float creamApplyDuration = 1.5f;
     public float creamApplyRadius = 0.5f;
 
-    [Header("Настройки Анимации 'Макияж'")]
+    [Header("Настройки Анимации 'Помада' (Возюканье)")]
+    public float lipstickDabDuration = 1.0f;
+    public float lipstickDabDistance = 0.1f;
+    public float lipstickDabSpeed = 15f;
+
+    [Header("Настройки Анимации 'Макияж с кистью' (Возюканье)")]
     public float makeupRotationAngle = 45f;
     public float makeupRotationDuration = 0.3f;
     public float makeupDabDuration = 1.0f;
@@ -27,23 +35,133 @@ public class HandAnimator : MonoBehaviour
         handController = GetComponent<HandController>();
     }
 
+    public void AnimateItemApplication(GamePhase phase, Action onApplicationComplete, Action onSequenceFinished)
+    {
+        Transform targetMarker = null;
+        switch (phase)
+        {
+            case GamePhase.Acne:
+                targetMarker = creamApplyPositionMarker;
+                break;
+            case GamePhase.Lipstick:
+                targetMarker = lipstickApplyPositionMarker;
+                break;
+        }
+
+        if (targetMarker == null)
+        {
+            onSequenceFinished?.Invoke();
+            return;
+        }
+
+        animationTargetPosition = targetMarker.position;
+        MoveItemToFaceTarget(() => {
+            if (phase == GamePhase.Lipstick)
+            {
+                StartCoroutine(LipstickDabCoroutine(onApplicationComplete, onSequenceFinished));
+            }
+            else
+            {
+                StartCoroutine(CreamCircularMovementCoroutine(onApplicationComplete, onSequenceFinished));
+            }
+        });
+    }
+
+    private void MoveItemToFaceTarget(Action onAnimationStart)
+    {
+        ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null || currentItem.tipTransform == null) { onAnimationStart?.Invoke(); return; }
+
+        Vector3 handToTipOffset = currentItem.tipTransform.position - handController.transform.position;
+        Vector3 finalHandPosition = animationTargetPosition - handToTipOffset;
+        handController.MoveTo(finalHandPosition, onAnimationStart);
+    }
+
+    private IEnumerator LipstickDabCoroutine(Action onApplicationComplete, Action onSequenceFinished)
+    {
+        ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null || currentItem.tipTransform == null) { onSequenceFinished?.Invoke(); yield break; }
+
+        Vector3 handToTipOffset = currentItem.tipTransform.position - handController.transform.position;
+        Vector3 handCenterPoint = animationTargetPosition - handToTipOffset;
+        float elapsedTime = 0f;
+        while (elapsedTime < lipstickDabDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float xOffset = Mathf.Sin(Time.time * lipstickDabSpeed) * lipstickDabDistance;
+            handController.transform.position = handCenterPoint + new Vector3(xOffset, 0, 0);
+            yield return null;
+        }
+        handController.transform.position = handCenterPoint;
+
+        onApplicationComplete?.Invoke();
+
+        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
+        handController.MoveTo(itemReturnPosition, () => {
+            handController.DetachAll();
+            handController.ReturnToStartPosition(onSequenceFinished);
+        });
+    }
+
+    private IEnumerator CreamCircularMovementCoroutine(Action onApplicationComplete, Action onSequenceFinished)
+    {
+        Vector3 centerPoint = handController.transform.position;
+        float elapsedTime = 0f;
+        while (elapsedTime < creamApplyDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float angle = (elapsedTime / creamApplyDuration) * 2 * Mathf.PI;
+            float xOffset = Mathf.Cos(angle) * creamApplyRadius;
+            float yOffset = Mathf.Sin(angle) * creamApplyRadius;
+            handController.transform.position = centerPoint + new Vector3(xOffset, yOffset, 0);
+            yield return null;
+        }
+        handController.transform.position = centerPoint;
+
+        onApplicationComplete?.Invoke();
+
+        ClickableItem currentItem = handController.GetAttachedItem();
+        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
+        handController.MoveTo(itemReturnPosition, () => {
+            handController.DetachAll();
+            handController.ReturnToStartPosition(onSequenceFinished);
+        });
+    }
+
     public void AnimateMakeupPickup(Vector3 palettePosition, Action onComplete)
     {
         onSequenceComplete = onComplete;
         animationTargetPosition = palettePosition;
         StartCoroutine(RotateCoroutine(makeupRotationAngle, makeupRotationDuration, () => {
             MoveToPalette(() => {
-                StartCoroutine(DabCoroutine(makeupDabDuration, () => {
+                StartCoroutine(BrushDabCoroutine(makeupDabDuration, () => {
                     StartCoroutine(RotateCoroutine(0, makeupRotationDuration, onSequenceComplete));
                 }));
             });
         }));
     }
 
-    public void AnimateMakeupApplication(Vector3 facePosition, Action onApplicationComplete, Action onSequenceFinished)
+    public void AnimateMakeupApplication(GamePhase phase, Action onApplicationComplete, Action onSequenceFinished)
     {
-        animationTargetPosition = facePosition;
-        MoveToFaceTarget(() => {
+        Transform targetMarker = null;
+        switch (phase)
+        {
+            case GamePhase.Blush:
+                targetMarker = blushApplyPositionMarker;
+                break;
+            case GamePhase.Eyeshadow:
+                targetMarker = eyeshadowApplyPositionMarker;
+                break;
+        }
+
+        if (targetMarker == null)
+        {
+            onSequenceFinished?.Invoke();
+            return;
+        }
+
+        animationTargetPosition = targetMarker.position;
+        MoveToFaceTargetBrush(() => {
             PerformFaceDabAnimation(onApplicationComplete, onSequenceFinished);
         });
     }
@@ -57,7 +175,7 @@ public class HandAnimator : MonoBehaviour
         handController.MoveTo(finalHandPosition, onComplete);
     }
 
-    private void MoveToFaceTarget(Action onComplete)
+    private void MoveToFaceTargetBrush(Action onComplete)
     {
         BrushTool currentTool = handController.GetAttachedTool();
         if (currentTool == null || currentTool.tipTransform == null) { onComplete?.Invoke(); return; }
@@ -68,7 +186,7 @@ public class HandAnimator : MonoBehaviour
 
     private void PerformFaceDabAnimation(Action onApplicationComplete, Action onSequenceFinished)
     {
-        StartCoroutine(DabCoroutine(makeupDabDuration, () => {
+        StartCoroutine(BrushDabCoroutine(makeupDabDuration, () => {
             onApplicationComplete?.Invoke();
             BrushTool currentTool = handController.GetAttachedTool();
             if (currentTool != null)
@@ -93,40 +211,26 @@ public class HandAnimator : MonoBehaviour
         handController.ReturnToStartPosition(onSequenceComplete);
     }
 
-    public void AnimateCreamApplication(Action onComplete)
-    {
-        onSequenceComplete = onComplete;
-        ClickableItem currentItem = handController.GetAttachedItem();
-        if (currentItem == null || applyAnimationPositionMarker == null) { onSequenceComplete?.Invoke(); return; }
-        handController.MoveTo(applyAnimationPositionMarker.position, PerformCreamApplicationAnimation);
-    }
-
-    private void PerformCreamApplicationAnimation()
-    {
-        StartCoroutine(CreamCircularMovementCoroutine(InitiateCreamItemReturn));
-    }
-
-    private void InitiateCreamItemReturn()
+    public void AnimateItemReturn(Action onItemReturned, Action onSequenceFinished)
     {
         ClickableItem currentItem = handController.GetAttachedItem();
+        if (currentItem == null)
+        {
+            onItemReturned?.Invoke();
+            onSequenceFinished?.Invoke();
+            return;
+        }
+
+        Vector3 handToItemOffset = currentItem.transform.position - handController.transform.position;
         Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
-        handController.MoveTo(itemReturnPosition, DetachCreamItemAndRetreatHandForCream);
-    }
+        Vector3 handTargetPosition = itemReturnPosition - handToItemOffset;
 
-    private void DetachCreamItemAndRetreatHandForCream()
-    {
-        handController.DetachAll();
-        handController.ReturnToStartPosition(onSequenceComplete);
-    }
-
-    public void AnimateItemReturn(Action onComplete)
-    {
-        ClickableItem currentItem = handController.GetAttachedItem();
-        if (currentItem == null) { onComplete?.Invoke(); return; }
-        Vector3 itemReturnPosition = currentItem.GetOriginalPosition();
-        handController.MoveTo(itemReturnPosition, () => {
+        handController.MoveTo(handTargetPosition, () => {
             handController.DetachAll();
-            handController.ReturnToStartPosition(onComplete);
+
+            onItemReturned?.Invoke();
+
+            handController.ReturnToStartPosition(onSequenceFinished);
         });
     }
 
@@ -145,7 +249,7 @@ public class HandAnimator : MonoBehaviour
         onComplete?.Invoke();
     }
 
-    private IEnumerator DabCoroutine(float duration, Action onComplete)
+    private IEnumerator BrushDabCoroutine(float duration, Action onComplete)
     {
         BrushTool currentTool = handController.GetAttachedTool();
         if (currentTool == null || currentTool.tipTransform == null) { onComplete?.Invoke(); yield break; }
@@ -160,23 +264,6 @@ public class HandAnimator : MonoBehaviour
             yield return null;
         }
         transform.position = handCenterPoint;
-        onComplete?.Invoke();
-    }
-
-    private IEnumerator CreamCircularMovementCoroutine(Action onComplete)
-    {
-        Vector3 centerPoint = transform.position;
-        float elapsedTime = 0f;
-        while (elapsedTime < creamApplyDuration)
-        {
-            elapsedTime += Time.deltaTime;
-            float angle = (elapsedTime / creamApplyDuration) * 2 * Mathf.PI;
-            float xOffset = Mathf.Cos(angle) * creamApplyRadius;
-            float yOffset = Mathf.Sin(angle) * creamApplyRadius;
-            transform.position = centerPoint + new Vector3(xOffset, yOffset, 0);
-            yield return null;
-        }
-        transform.position = centerPoint;
         onComplete?.Invoke();
     }
 }

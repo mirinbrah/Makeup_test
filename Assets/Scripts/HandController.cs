@@ -10,7 +10,7 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     public Transform startPositionMarker;
 
     private ClickableItem attachedItem;
-    private BrushTool attachedTool; // Убедитесь, что это поле у вас есть
+    private BrushTool attachedTool;
     private Vector3 autoTargetPosition;
     private Action onMovementComplete;
     private bool isMovingAutomated = false;
@@ -40,8 +40,10 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     {
         DetachAll();
         attachedItem = item;
-        attachedItem.transform.SetParent(gripPoint);
-        attachedItem.transform.localPosition = Vector3.zero;
+        item.transform.SetParent(transform);
+        item.transform.rotation = transform.rotation;
+        Vector3 itemOffset = item.transform.position - item.gripPoint.position;
+        item.transform.position = this.gripPoint.position + itemOffset;
     }
 
     public void AttachTool(BrushTool tool)
@@ -58,21 +60,15 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
     {
         if (attachedItem != null)
         {
-            attachedItem.transform.SetParent(null);
+            attachedItem.transform.SetParent(attachedItem.GetOriginalParent());
             attachedItem.transform.position = attachedItem.GetOriginalPosition();
             attachedItem = null;
         }
         if (attachedTool != null)
         {
-            // --- ИЗМЕНЕННАЯ ЛОГИКА ЗДЕСЬ ---
-            // 1. Возвращаем кисточку в ее исходный родительский контейнер
             attachedTool.transform.SetParent(attachedTool.GetOriginalParent());
-
-            // 2. Восстанавливаем ее позицию и поворот
             attachedTool.transform.position = attachedTool.GetOriginalPosition();
             attachedTool.transform.rotation = attachedTool.GetOriginalRotation();
-
-            // 3. Отпускаем ссылку
             attachedTool = null;
         }
     }
@@ -141,7 +137,6 @@ public class HandController : MonoBehaviour, IBeginDragHandler, IDragHandler, IE
 
     private Vector3 GetMouseWorldPos()
     {
-        // Для 2D игры лучше обнулять Z координату
         Vector3 mousePos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
         mousePos.z = 0;
         return mousePos;

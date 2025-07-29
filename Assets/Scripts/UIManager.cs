@@ -56,7 +56,6 @@ public class UIManager : MonoBehaviour
 
     private void OnResetButtonClicked()
     {
-        Debug.Log("UIManager: Кнопка Reset нажата.");
         GameManager.Instance.PerformReset();
     }
 }

@@ -6,26 +6,23 @@ public class ClickableItem : MonoBehaviour, IPointerClickHandler
     [Header("Настройки Предмета")]
     public GamePhase itemPhase;
     public Transform dragStartPosition;
+    public Transform tipTransform;
+    public Transform gripPoint;
 
-    public Vector3 originalPosition;
+    private Vector3 originalPosition;
+    private Transform originalParent;
 
     void Awake()
     {
         originalPosition = transform.position;
+        originalParent = transform.parent;
     }
 
-    public Vector3 GetOriginalPosition()
-    {
-        return originalPosition;
-    }
+    public Vector3 GetOriginalPosition() => originalPosition;
+    public Transform GetOriginalParent() => originalParent;
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (dragStartPosition == null)
-        {
-            Debug.LogError($"У объекта {gameObject.name} не назначена точка 'Drag Start Position'!", this);
-            return;
-        }
         GameManager.Instance.OnItemClicked(this);
     }
 }
